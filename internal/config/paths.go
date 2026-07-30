@@ -5,24 +5,53 @@ import (
 	"path/filepath"
 )
 
+// EnsureDirs creates all required directories.
+// Deprecated: Use config.EnsureDirs() instead.
 func EnsureDirectories() error {
-	home, err := os.UserHomeDir()
+	return EnsureDirs()
+}
+
+// ServiceDirPath returns the path for a specific service version.
+// Deprecated: Use config.ServiceDir() instead.
+func ServiceDirPath(name, version string) (string, error) {
+	return ServiceDir(name, version)
+}
+
+// CustomTemplatesDir returns the path for custom templates.
+// Deprecated: Use config.TemplatesDir() instead.
+func CustomTemplatesDir() (string, error) {
+	return TemplatesDir()
+}
+
+// EnsureDir creates a single directory if it doesn't exist.
+func EnsureDir(path string) error {
+	return os.MkdirAll(path, 0700)
+}
+
+// DirExists checks if a directory exists.
+func DirExists(path string) bool {
+	info, err := os.Stat(path)
 	if err != nil {
-		return err
+		return false
 	}
+	return info.IsDir()
+}
 
-	dirs := []string{
-		filepath.Join(home, ConfigDir),
-		filepath.Join(home, ConfigDir, "cache", "tags"),
-		filepath.Join(home, ConfigDir, "templates"),
-		filepath.Join(home, ConfigDir, "services"),
+// FileExists checks if a file exists.
+func FileExists(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
 	}
+	return !info.IsDir()
+}
 
-	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0700); err != nil {
-			return err
-		}
-	}
+// HomeDir returns the user's home directory.
+func HomeDir() (string, error) {
+	return os.UserHomeDir()
+}
 
-	return nil
+// JoinPath joins path elements.
+func JoinPath(elem ...string) string {
+	return filepath.Join(elem...)
 }
