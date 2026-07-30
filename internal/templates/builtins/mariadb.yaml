@@ -1,0 +1,48 @@
+name: MariaDB
+description: Drop-in replacement for MySQL
+category: database
+icon: "🐭"
+
+versions:
+  - key: "11"
+    image: mariadb:11
+    default_port: 3306
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_vars:
+      MYSQL_ROOT_PASSWORD: "${CONFIG_PASSWORD}"
+      MYSQL_DATABASE: "${CONFIG_DATABASE}"
+      MYSQL_USER: "${CONFIG_USER}"
+      MYSQL_PASSWORD: "${CONFIG_PASSWORD}"
+      TZ: "${GENERAL_TIMEZONE}"
+    volumes:
+      - "./data:/var/lib/mysql"
+    networks:
+      - "${GENERAL_DEFAULT_NETWORK}"
+    ports:
+      - "${CONFIG_PORT}:3306"
+
+config_fields:
+  - key: port
+    label: "Port"
+    type: number
+    default: "3306"
+    required: true
+  - key: user
+    label: "Username"
+    type: text
+    default: "root"
+    required: true
+  - key: password
+    label: "Password"
+    type: password
+    default: "mariadb"
+    required: true
+  - key: database
+    label: "Database Name"
+    type: text
+    default: "mariadb"
+    required: true

@@ -1,0 +1,60 @@
+name: MongoDB
+description: NoSQL document-oriented database
+category: database
+icon: "🍃"
+
+versions:
+  - key: "7"
+    image: mongo:7
+    default_port: 27017
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_vars:
+      MONGO_INITDB_ROOT_USERNAME: "${CONFIG_USER}"
+      MONGO_INITDB_ROOT_PASSWORD: "${CONFIG_PASSWORD}"
+      TZ: "${GENERAL_TIMEZONE}"
+    volumes:
+      - "./data:/data/db"
+    networks:
+      - "${GENERAL_DEFAULT_NETWORK}"
+    ports:
+      - "${CONFIG_PORT}:27017"
+
+  - key: "8"
+    image: mongo:8
+    default_port: 27018
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_vars:
+      MONGO_INITDB_ROOT_USERNAME: "${CONFIG_USER}"
+      MONGO_INITDB_ROOT_PASSWORD: "${CONFIG_PASSWORD}"
+      TZ: "${GENERAL_TIMEZONE}"
+    volumes:
+      - "./data:/data/db"
+    networks:
+      - "${GENERAL_DEFAULT_NETWORK}"
+    ports:
+      - "${CONFIG_PORT}:27017"
+
+config_fields:
+  - key: port
+    label: "Port"
+    type: number
+    default: "27017"
+    required: true
+  - key: user
+    label: "Username"
+    type: text
+    default: "admin"
+    required: true
+  - key: password
+    label: "Password"
+    type: password
+    default: "mongo"
+    required: true

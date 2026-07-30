@@ -1,0 +1,27 @@
+name: Memcached
+description: High-performance memory caching system
+category: cache
+icon: "🔧"
+
+versions:
+  - key: "1.6"
+    image: memcached:1.6-alpine
+    default_port: 11211
+    env_vars:
+      TZ: "${GENERAL_TIMEZONE}"
+    networks:
+      - "${GENERAL_DEFAULT_NETWORK}"
+    ports:
+      - "${CONFIG_PORT}:11211"
+
+config_fields:
+  - key: port
+    label: "Port"
+    type: number
+    default: "11211"
+    required: true
+  - key: memory
+    label: "Max Memory (MB)"
+    type: number
+    default: "64"
+    required: true

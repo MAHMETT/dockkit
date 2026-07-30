@@ -1,0 +1,90 @@
+name: MySQL
+description: Popular open source relational database
+category: database
+icon: "🐬"
+
+versions:
+  - key: "8.0"
+    image: mysql:8.0
+    default_port: 3306
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_vars:
+      MYSQL_ROOT_PASSWORD: "${CONFIG_PASSWORD}"
+      MYSQL_DATABASE: "${CONFIG_DATABASE}"
+      MYSQL_USER: "${CONFIG_USER}"
+      MYSQL_PASSWORD: "${CONFIG_PASSWORD}"
+      TZ: "${GENERAL_TIMEZONE}"
+    volumes:
+      - "./data:/var/lib/mysql"
+    networks:
+      - "${GENERAL_DEFAULT_NETWORK}"
+    ports:
+      - "${CONFIG_PORT}:3306"
+
+  - key: "8.4"
+    image: mysql:8.4
+    default_port: 3307
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_vars:
+      MYSQL_ROOT_PASSWORD: "${CONFIG_PASSWORD}"
+      MYSQL_DATABASE: "${CONFIG_DATABASE}"
+      MYSQL_USER: "${CONFIG_USER}"
+      MYSQL_PASSWORD: "${CONFIG_PASSWORD}"
+      TZ: "${GENERAL_TIMEZONE}"
+    volumes:
+      - "./data:/var/lib/mysql"
+    networks:
+      - "${GENERAL_DEFAULT_NETWORK}"
+    ports:
+      - "${CONFIG_PORT}:3306"
+
+  - key: "9.0"
+    image: mysql:9.0
+    default_port: 3308
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_vars:
+      MYSQL_ROOT_PASSWORD: "${CONFIG_PASSWORD}"
+      MYSQL_DATABASE: "${CONFIG_DATABASE}"
+      MYSQL_USER: "${CONFIG_USER}"
+      MYSQL_PASSWORD: "${CONFIG_PASSWORD}"
+      TZ: "${GENERAL_TIMEZONE}"
+    volumes:
+      - "./data:/var/lib/mysql"
+    networks:
+      - "${GENERAL_DEFAULT_NETWORK}"
+    ports:
+      - "${CONFIG_PORT}:3306"
+
+config_fields:
+  - key: port
+    label: "Port"
+    type: number
+    default: "3306"
+    required: true
+  - key: user
+    label: "Username"
+    type: text
+    default: "root"
+    required: true
+  - key: password
+    label: "Password"
+    type: password
+    default: "mysql"
+    required: true
+  - key: database
+    label: "Database Name"
+    type: text
+    default: "mysql"
+    required: true

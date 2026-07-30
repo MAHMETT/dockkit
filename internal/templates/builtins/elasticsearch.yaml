@@ -1,0 +1,32 @@
+name: Elasticsearch
+description: Distributed search and analytics engine
+category: search
+icon: "🔍"
+
+versions:
+  - key: "8"
+    image: elasticsearch:8.14.0
+    default_port: 9200
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_vars:
+      discovery.type: "single-node"
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      TZ: "${GENERAL_TIMEZONE}"
+    volumes:
+      - "./data:/usr/share/elasticsearch/data"
+    networks:
+      - "${GENERAL_DEFAULT_NETWORK}"
+    ports:
+      - "${CONFIG_PORT}:9200"
+
+config_fields:
+  - key: port
+    label: "Port"
+    type: number
+    default: "9200"
+    required: true

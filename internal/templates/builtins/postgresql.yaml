@@ -1,0 +1,90 @@
+name: PostgreSQL
+description: Advanced open source relational database
+category: database
+icon: "🐘"
+
+versions:
+  - key: "15"
+    image: postgres:15-alpine
+    default_port: 5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CONFIG_USER} -d ${CONFIG_DATABASE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_vars:
+      POSTGRES_USER: "${CONFIG_USER}"
+      POSTGRES_PASSWORD: "${CONFIG_PASSWORD}"
+      POSTGRES_DB: "${CONFIG_DATABASE}"
+      TZ: "${GENERAL_TIMEZONE}"
+      PGTZ: "${GENERAL_TIMEZONE}"
+    volumes:
+      - "./data:/var/lib/postgresql/data"
+    networks:
+      - "${GENERAL_DEFAULT_NETWORK}"
+    ports:
+      - "${CONFIG_PORT}:5432"
+
+  - key: "16"
+    image: postgres:16-alpine
+    default_port: 5433
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CONFIG_USER} -d ${CONFIG_DATABASE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_vars:
+      POSTGRES_USER: "${CONFIG_USER}"
+      POSTGRES_PASSWORD: "${CONFIG_PASSWORD}"
+      POSTGRES_DB: "${CONFIG_DATABASE}"
+      TZ: "${GENERAL_TIMEZONE}"
+      PGTZ: "${GENERAL_TIMEZONE}"
+    volumes:
+      - "./data:/var/lib/postgresql/data"
+    networks:
+      - "${GENERAL_DEFAULT_NETWORK}"
+    ports:
+      - "${CONFIG_PORT}:5432"
+
+  - key: "17"
+    image: postgres:17-alpine
+    default_port: 5434
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CONFIG_USER} -d ${CONFIG_DATABASE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_vars:
+      POSTGRES_USER: "${CONFIG_USER}"
+      POSTGRES_PASSWORD: "${CONFIG_PASSWORD}"
+      POSTGRES_DB: "${CONFIG_DATABASE}"
+      TZ: "${GENERAL_TIMEZONE}"
+      PGTZ: "${GENERAL_TIMEZONE}"
+    volumes:
+      - "./data:/var/lib/postgresql/data"
+    networks:
+      - "${GENERAL_DEFAULT_NETWORK}"
+    ports:
+      - "${CONFIG_PORT}:5432"
+
+config_fields:
+  - key: port
+    label: "Port"
+    type: number
+    default: "5432"
+    required: true
+  - key: user
+    label: "Username"
+    type: text
+    default: "postgres"
+    required: true
+  - key: password
+    label: "Password"
+    type: password
+    default: "postgres"
+    required: true
+  - key: database
+    label: "Database Name"
+    type: text
+    default: "postgres"
+    required: true

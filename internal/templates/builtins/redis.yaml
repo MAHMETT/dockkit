@@ -1,0 +1,34 @@
+name: Redis
+description: In-memory data structure store
+category: cache
+icon: "⚡"
+
+versions:
+  - key: "7"
+    image: redis:7-alpine
+    default_port: 6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_vars:
+      TZ: "${GENERAL_TIMEZONE}"
+    volumes:
+      - "./data:/data"
+    networks:
+      - "${GENERAL_DEFAULT_NETWORK}"
+    ports:
+      - "${CONFIG_PORT}:6379"
+
+config_fields:
+  - key: port
+    label: "Port"
+    type: number
+    default: "6379"
+    required: true
+  - key: password
+    label: "Password"
+    type: password
+    default: ""
+    required: false
