@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"strings"
 	"time"
 
@@ -81,14 +82,27 @@ func (c *Client) GetContainer(ctx context.Context, nameOrID string) (*ContainerI
 	}
 
 	if cr.State.StartedAt != "" {
-		info.StartedAt, _ = time.Parse(time.RFC3339Nano, cr.State.StartedAt)
+		t, err := time.Parse(time.RFC3339Nano, cr.State.StartedAt)
+		if err != nil {
+			log.Printf("warning: parsing StartedAt %q: %v", cr.State.StartedAt, err)
+		}
+		info.StartedAt = t
 	}
 	if cr.State.FinishedAt != "" {
-		info.FinishedAt, _ = time.Parse(time.RFC3339Nano, cr.State.FinishedAt)
+		t, err := time.Parse(time.RFC3339Nano, cr.State.FinishedAt)
+		if err != nil {
+			log.Printf("warning: parsing FinishedAt %q: %v", cr.State.FinishedAt, err)
+		}
+		info.FinishedAt = t
 	}
 
-	created, _ := time.Parse(time.RFC3339Nano, cr.Created)
-	info.CreatedAt = created
+	if cr.Created != "" {
+		t, err := time.Parse(time.RFC3339Nano, cr.Created)
+		if err != nil {
+			log.Printf("warning: parsing Created %q: %v", cr.Created, err)
+		}
+		info.CreatedAt = t
+	}
 	info.ExitCode = cr.State.ExitCode
 
 	for netName := range cr.NetworkSettings.Networks {
@@ -97,8 +111,12 @@ func (c *Client) GetContainer(ctx context.Context, nameOrID string) (*ContainerI
 
 	for port, bindings := range cr.NetworkSettings.Ports {
 		for _, b := range bindings {
+			hostIP := b.HostIP.String()
+			if hostIP == "<nil>" || hostIP == "::" {
+				hostIP = "0.0.0.0"
+			}
 			info.Ports = append(info.Ports, PortMapping{
-				HostIP:        b.HostIP.String(),
+				HostIP:        hostIP,
 				HostPort:      b.HostPort,
 				ContainerPort: port.Port(),
 				Protocol:      string(port.Proto()),
@@ -166,6 +184,7 @@ func (c *Client) RemoveContainer(ctx context.Context, nameOrID string, force boo
 }
 
 // StreamLogs streams logs from a container.
+// Caller MUST read the returned io.ReadCloser to completion for streaming to work.
 func (c *Client) StreamLogs(ctx context.Context, nameOrID string, follow bool) (io.ReadCloser, error) {
 	opts := client.ContainerLogsOptions{
 		ShowStdout: true,
@@ -189,7 +208,10 @@ func (c *Client) FindContainerByName(ctx context.Context, name string) (*Contain
 	}
 
 	for _, ctr := range containers {
-		if ctr.Name == name || ctr.ID[:12] == name {
+		if ctr.Name == name {
+			return &ctr, nil
+		}
+		if len(ctr.ID) >= 12 && ctr.ID[:12] == name {
 			return &ctr, nil
 		}
 	}
@@ -247,4 +269,12 @@ func FilterByNamePrefix(containers []ContainerInfo, prefix string) []ContainerIn
 		}
 	}
 	return result
+}
+
+// ShortID returns the first 12 characters of a container ID.
+func ShortID(id string) string {
+	if len(id) >= 12 {
+		return id[:12]
+	}
+	return id
 }

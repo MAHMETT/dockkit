@@ -40,6 +40,10 @@ func composeExec(ctx context.Context, dir string, args ...string) error {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
+	if err := validateDir(dir); err != nil {
+		return err
+	}
+
 	composeArgs := buildComposeArgs(dir, args)
 	cmd := exec.CommandContext(ctx, "docker", composeArgs...)
 
@@ -54,8 +58,12 @@ func composeExec(ctx context.Context, dir string, args ...string) error {
 
 // composeExecOutput runs a docker compose command and returns stdout.
 func composeExecOutput(ctx context.Context, dir string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
+
+	if err := validateDir(dir); err != nil {
+		return "", err
+	}
 
 	composeArgs := buildComposeArgs(dir, args)
 	cmd := exec.CommandContext(ctx, "docker", composeArgs...)
@@ -82,4 +90,16 @@ func buildComposeArgs(dir string, args []string) []string {
 	}
 
 	return append(result, args...)
+}
+
+// validateDir checks if a directory exists.
+func validateDir(dir string) error {
+	info, err := os.Stat(dir)
+	if err != nil {
+		return fmt.Errorf("service directory %s: %w", dir, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("service path %s is not a directory", dir)
+	}
+	return nil
 }

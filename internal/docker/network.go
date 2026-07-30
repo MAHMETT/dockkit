@@ -42,7 +42,9 @@ func (c *Client) NetworkExists(ctx context.Context, name string) (bool, error) {
 
 	_, err := c.api.NetworkInspect(ctx, name, client.NetworkInspectOptions{})
 	if err != nil {
-		if strings.Contains(err.Error(), "No such network") {
+		// Docker SDK returns "No such network" for missing networks
+		if strings.Contains(err.Error(), "No such network") ||
+			strings.Contains(err.Error(), "not found") {
 			return false, nil
 		}
 		return false, fmt.Errorf("inspecting network %s: %w", name, err)

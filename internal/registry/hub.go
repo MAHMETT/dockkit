@@ -6,20 +6,24 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
 const (
-	hubAuthURL    = "https://auth.docker.io/token"
-	hubRegistryURL = "https://registry.hub.docker.com/v2"
-	hubTagsURL    = "https://registry.hub.docker.com/v2/library/%s/tags/list"
-	defaultTTL    = 24 * time.Hour
+	hubAuthURL  = "https://auth.docker.io/token"
+	hubTagsURL  = "https://registry.hub.docker.com/v2/library/%s/tags/list"
+	defaultTTL  = 24 * time.Hour
+	tokenTTL    = 240 * time.Second // Docker Hub tokens valid for 300s, use 240s for safety
 )
 
 // HubClient fetches tags from Docker Hub.
 type HubClient struct {
-	client *http.Client
-	cache  *tagCache
+	client    *http.Client
+	cache     *tagCache
+	tokenMu   sync.Mutex
+	token     string
+	tokenExp  time.Time
 }
 
 // NewHubClient creates a new Docker Hub client with caching.
@@ -38,7 +42,7 @@ func (h *HubClient) FetchTags(image string) ([]TagInfo, error) {
 		return tags, nil
 	}
 
-	// Get auth token
+	// Get auth token (cached)
 	token, err := h.getToken(image)
 	if err != nil {
 		return nil, fmt.Errorf("getting auth token for %s: %w", image, err)
@@ -57,7 +61,16 @@ func (h *HubClient) FetchTags(image string) ([]TagInfo, error) {
 }
 
 // getToken gets a JWT token from Docker Hub for pulling tags.
+// Token is cached for 240 seconds.
 func (h *HubClient) getToken(image string) (string, error) {
+	h.tokenMu.Lock()
+	defer h.tokenMu.Unlock()
+
+	// Return cached token if still valid
+	if h.token != "" && time.Now().Before(h.tokenExp) {
+		return h.token, nil
+	}
+
 	url := fmt.Sprintf("%s?service=registry.docker.io&scope=repository:library/%s:pull", hubAuthURL, image)
 
 	resp, err := h.client.Get(url)
@@ -76,6 +89,9 @@ func (h *HubClient) getToken(image string) (string, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", err
 	}
+
+	h.token = result.Token
+	h.tokenExp = time.Now().Add(tokenTTL)
 
 	return result.Token, nil
 }
@@ -97,7 +113,8 @@ func (h *HubClient) fetchTagsFromHub(image, token string) ([]TagInfo, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		// Limit error body read to prevent memory issues
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return nil, fmt.Errorf("hub request failed: %d %s", resp.StatusCode, string(body))
 	}
 
@@ -123,7 +140,11 @@ func (h *HubClient) fetchTagsFromHub(image, token string) ([]TagInfo, error) {
 	return tags, nil
 }
 
-// ClearCache clears the tag cache.
+// ClearCache clears the tag cache and token.
 func (h *HubClient) ClearCache() {
 	h.cache.Clear()
+	h.tokenMu.Lock()
+	h.token = ""
+	h.tokenExp = time.Time{}
+	h.tokenMu.Unlock()
 }

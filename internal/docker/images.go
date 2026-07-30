@@ -41,6 +41,8 @@ func (c *Client) ListImages(ctx context.Context) ([]ImageInfo, error) {
 }
 
 // PullImage pulls an image from Docker Hub.
+// The returned reader MUST be consumed to completion for the pull to finish.
+// Use io.Copy(io.Discard, reader) if you don't need the output.
 func (c *Client) PullImage(ctx context.Context, ref string) (io.ReadCloser, error) {
 	reader, err := c.api.ImagePull(ctx, ref, client.ImagePullOptions{})
 	if err != nil {
@@ -62,6 +64,7 @@ func (c *Client) RemoveImage(ctx context.Context, ref string) error {
 func (c *Client) ImageExists(ctx context.Context, ref string) (bool, error) {
 	_, err := c.api.ImageInspect(ctx, ref)
 	if err != nil {
+		// Docker SDK wraps not-found errors with "No such image"
 		if strings.Contains(err.Error(), "No such image") {
 			return false, nil
 		}

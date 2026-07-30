@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/moby/moby/api/types/container"
 )
 
 // HealthStatus represents the health status of a container.
@@ -30,7 +32,7 @@ func (c *Client) GetHealthStatus(ctx context.Context, nameOrID string) (*HealthS
 	}
 
 	if info.Health == "" {
-		return &HealthStatus{Status: "none"}, nil
+		return &HealthStatus{Status: string(container.NoHealthcheck)}, nil
 	}
 
 	return &HealthStatus{
@@ -44,11 +46,11 @@ func (c *Client) IsHealthy(ctx context.Context, nameOrID string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return status.Status == "healthy", nil
+	return status.Status == string(container.Healthy), nil
 }
 
 // WaitForHealthy waits for a container to become healthy with timeout.
-func WaitForHealthy(ctx context.Context, client *Client, nameOrID string, timeout time.Duration) error {
+func (c *Client) WaitForHealthy(ctx context.Context, nameOrID string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
@@ -62,19 +64,19 @@ func WaitForHealthy(ctx context.Context, client *Client, nameOrID string, timeou
 				return fmt.Errorf("timeout waiting for %s to be healthy", nameOrID)
 			}
 
-			info, err := client.GetContainer(ctx, nameOrID)
+			info, err := c.GetContainer(ctx, nameOrID)
 			if err != nil {
 				continue
 			}
 
 			switch info.Health {
-			case "healthy":
+			case string(container.Healthy):
 				return nil
-			case "unhealthy":
+			case string(container.Unhealthy):
 				return fmt.Errorf("container %s is unhealthy", nameOrID)
 			}
 
-			if info.State == "exited" || info.State == "dead" {
+			if info.State == string(container.StateExited) || info.State == string(container.StateDead) {
 				return fmt.Errorf("container %s exited with code %d", nameOrID, info.ExitCode)
 			}
 		}
