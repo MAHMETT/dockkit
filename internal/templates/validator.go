@@ -2,6 +2,7 @@ package templates
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -15,7 +16,13 @@ func (e *TemplateError) Error() string {
 	return fmt.Sprintf("template %s: %s", e.Field, e.Message)
 }
 
+// TemplateErrors is a collection of template validation errors.
 type TemplateErrors []*TemplateError
+
+// validConfigFieldTypes defines allowed config field types.
+var validConfigFieldTypes = map[string]bool{
+	"text": true, "number": true, "password": true, "select": true,
+}
 
 func (errs TemplateErrors) Error() string {
 	if len(errs) == 0 {
@@ -96,10 +103,7 @@ func Validate(tmpl *Template) TemplateErrors {
 		if f.Key == "" {
 			errs = append(errs, &TemplateError{Field: "config_fields.key", Message: "field key is required"})
 		}
-		validTypes := map[string]bool{
-			"text": true, "number": true, "password": true, "select": true,
-		}
-		if !validTypes[f.Type] {
+		if !validConfigFieldTypes[f.Type] {
 			errs = append(errs, &TemplateError{
 				Field:   fmt.Sprintf("config_fields.%s.type", f.Key),
 				Message: fmt.Sprintf("invalid type %q: must be text, number, password, or select", f.Type),
@@ -122,12 +126,9 @@ func ValidateConfigField(field ConfigField, value string) error {
 
 	switch field.Type {
 	case "number":
-		n := 0
-		for _, c := range value {
-			if c < '0' || c > '9' {
-				return fmt.Errorf("%s must be a number", field.Label)
-			}
-			n = n*10 + int(c-'0')
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("%s must be a number", field.Label)
 		}
 		if n < 1024 || n > 65535 {
 			return fmt.Errorf("%s must be between 1024 and 65535", field.Label)

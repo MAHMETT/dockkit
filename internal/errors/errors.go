@@ -1,6 +1,9 @@
 package errors
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // ErrorCode represents a category of error.
 type ErrorCode int
@@ -135,7 +138,8 @@ var (
 
 // UserMessage returns a human-readable message for display.
 func UserMessage(err error) string {
-	if e, ok := err.(*DockkitError); ok {
+	var e *DockkitError
+	if errors.As(err, &e) {
 		switch e.Code {
 		case ErrCodeDockerNotRunning:
 			return "Docker is not running. Start Docker Desktop or run: sudo systemctl start docker"

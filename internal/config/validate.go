@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-var containerNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]+$`)
+var containerNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
 
 type ValidationError struct {
 	Field   string

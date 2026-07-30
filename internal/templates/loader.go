@@ -3,6 +3,7 @@ package templates
 import (
 	"embed"
 	"fmt"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -70,9 +71,8 @@ func ListBuiltin() ([]string, error) {
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			name := entry.Name()
-			// Remove .yaml extension
-			if len(name) > 5 && name[len(name)-5:] == ".yaml" {
-				names = append(names, name[:len(name)-5])
+			if strings.HasSuffix(name, ".yaml") {
+				names = append(names, strings.TrimSuffix(name, ".yaml"))
 			}
 		}
 	}

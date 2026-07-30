@@ -133,8 +133,13 @@ func Render(tmpl *Template, opts RenderOptions) (*ComposeConfig, error) {
 
 	if len(version.Networks) > 0 {
 		compose.Networks = map[string]ComposeNetwork{}
+		seen := map[string]bool{}
 		for _, n := range version.Networks {
 			name := interpolator.Interpolate(n)
+			if seen[name] {
+				continue
+			}
+			seen[name] = true
 			compose.Networks[name] = ComposeNetwork{
 				Name:   name,
 				Driver: "bridge",

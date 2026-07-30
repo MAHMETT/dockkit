@@ -278,7 +278,9 @@ func TestCopyFile(t *testing.T) {
 	src := filepath.Join(dir, "src.txt")
 	dst := filepath.Join(dir, "dst.txt")
 
-	os.WriteFile(src, []byte("hello"), 0600)
+	if err := os.WriteFile(src, []byte("hello"), 0600); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
 	if err := copyFile(src, dst); err != nil {
 		t.Fatalf("copyFile() error = %v", err)
 	}

@@ -147,7 +147,7 @@ func SaveToFile(cfg *Config, path string) error {
 
 	// Backup existing config
 	if _, err := os.Stat(path); err == nil {
-		backup := path + ".backup." + time.Now().Format("20060102-150405")
+		backup := path + ".backup." + time.Now().Format("20060102-150405.000000")
 		if err := copyFile(path, backup); err != nil {
 			return fmt.Errorf("backing up config: %w", err)
 		}
@@ -167,33 +167,17 @@ func SaveToFile(cfg *Config, path string) error {
 
 // EnsureDirs creates all required directories.
 func EnsureDirs() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("home dir: %w", err)
+	}
+
 	dirs := []string{
-		// will be filled by each dir function
+		filepath.Join(home, ConfigDirName),
+		filepath.Join(home, ConfigDirName, "services"),
+		filepath.Join(home, ConfigDirName, "templates"),
+		filepath.Join(home, ConfigDirName, "cache", "tags"),
 	}
-
-	cfgDir, err := ConfigDir()
-	if err != nil {
-		return err
-	}
-	dirs = append(dirs, cfgDir)
-
-	svcDir, err := ServicesDir()
-	if err != nil {
-		return err
-	}
-	dirs = append(dirs, svcDir)
-
-	tmplDir, err := TemplatesDir()
-	if err != nil {
-		return err
-	}
-	dirs = append(dirs, tmplDir)
-
-	cacheDir, err := CacheDir()
-	if err != nil {
-		return err
-	}
-	dirs = append(dirs, cacheDir)
 
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0700); err != nil {
