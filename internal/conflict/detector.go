@@ -8,56 +8,39 @@ import (
 	"github.com/MAHMETT/dockkit/internal/config"
 )
 
-type ConflictType int
-
-const (
-	ConflictPort ConflictType = iota
-	ConflictContainerName
-	ConflictNetwork
-	ConflictVolume
-)
-
-type ConflictSeverity int
-
-const (
-	SeverityError ConflictSeverity = iota
-	SeverityWarning
-)
-
-type Conflict struct {
-	Type      ConflictType
-	Severity  ConflictSeverity
-	ServiceA  string
-	ServiceB  string
-	Resource  string
-	Message   string
-	Suggested string
-}
-
+// Detector scans config for conflicts.
 type Detector struct {
 	config *config.Config
 }
 
+// NewDetector creates a new conflict detector.
 func NewDetector(cfg *config.Config) *Detector {
 	return &Detector{config: cfg}
 }
 
-func (d *Detector) Detect() []Conflict {
-	var conflicts []Conflict
+// Detect scans the config and returns all conflicts.
+func (d *Detector) Detect() ConflictList {
+	var conflicts ConflictList
 	conflicts = append(conflicts, d.detectPortConflicts()...)
 	conflicts = append(conflicts, d.detectContainerNameConflicts()...)
+	conflicts = append(conflicts, d.detectDisabledServiceWarnings()...)
 	return conflicts
 }
 
-func (d *Detector) detectPortConflicts() []Conflict {
-	var conflicts []Conflict
-	portMap := map[int]string{}
+// detectPortConflicts checks for port conflicts between enabled services.
+func (d *Detector) detectPortConflicts() ConflictList {
+	var conflicts ConflictList
+	portMap := map[int]string{} // port -> "service version"
 
 	for name, svc := range d.config.Services {
 		for ver, cfg := range svc.Versions {
 			if !cfg.Enabled {
 				continue
 			}
+			if cfg.Port == 0 {
+				continue
+			}
+
 			key := fmt.Sprintf("%s %s", name, ver)
 			if existing, ok := portMap[cfg.Port]; ok {
 				conflicts = append(conflicts, Conflict{
@@ -78,8 +61,10 @@ func (d *Detector) detectPortConflicts() []Conflict {
 	return conflicts
 }
 
-func (d *Detector) detectContainerNameConflicts() []Conflict {
-	var conflicts []Conflict
+// detectContainerNameConflicts checks for container name conflicts.
+func (d *Detector) detectContainerNameConflicts() ConflictList {
+	var conflicts ConflictList
+	nameMap := map[string]string{} // container_name -> "service version"
 
 	for name, svc := range d.config.Services {
 		for ver, cfg := range svc.Versions {
@@ -89,27 +74,41 @@ func (d *Detector) detectContainerNameConflicts() []Conflict {
 			if cfg.ContainerName == "" {
 				continue
 			}
-			for otherName, otherSvc := range d.config.Services {
-				for otherVer, otherCfg := range otherSvc.Versions {
-					if !otherCfg.Enabled {
-						continue
-					}
-					if name == otherName && ver == otherVer {
-						continue
-					}
-					if cfg.ContainerName == otherCfg.ContainerName {
-						keyA := fmt.Sprintf("%s %s", name, ver)
-						keyB := fmt.Sprintf("%s %s", otherName, otherVer)
-						conflicts = append(conflicts, Conflict{
-							Type:     ConflictContainerName,
-							Severity: SeverityError,
-							ServiceA: keyA,
-							ServiceB: keyB,
-							Resource: cfg.ContainerName,
-							Message:  fmt.Sprintf("Container name %q used by both %s and %s", cfg.ContainerName, keyA, keyB),
-						})
-					}
-				}
+
+			key := fmt.Sprintf("%s %s", name, ver)
+			if existing, ok := nameMap[cfg.ContainerName]; ok {
+				conflicts = append(conflicts, Conflict{
+					Type:      ConflictContainerName,
+					Severity:  SeverityError,
+					ServiceA:  existing,
+					ServiceB:  key,
+					Resource:  cfg.ContainerName,
+					Message:   fmt.Sprintf("Container name %q used by both %s and %s", cfg.ContainerName, existing, key),
+					Suggested: SuggestContainerName(cfg.ContainerName, nameMap),
+				})
+			} else {
+				nameMap[cfg.ContainerName] = key
+			}
+		}
+	}
+
+	return conflicts
+}
+
+// detectDisabledServiceWarnings warns about disabled services.
+func (d *Detector) detectDisabledServiceWarnings() ConflictList {
+	var conflicts ConflictList
+
+	for name, svc := range d.config.Services {
+		for ver, cfg := range svc.Versions {
+			if !cfg.Enabled {
+				key := fmt.Sprintf("%s %s", name, ver)
+				conflicts = append(conflicts, Conflict{
+					Type:     ConflictPort,
+					Severity: SeverityWarning,
+					ServiceA: key,
+					Message:  fmt.Sprintf("Service %s is disabled", key),
+				})
 			}
 		}
 	}
@@ -131,6 +130,7 @@ func (d *Detector) SuggestPort(port int) string {
 	return ""
 }
 
+// isPortOccupied checks if a port is in use on the host.
 func isPortOccupied(port int) bool {
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), 100*time.Millisecond)
 	if err != nil {
@@ -140,6 +140,7 @@ func isPortOccupied(port int) bool {
 	return true
 }
 
+// isPortUsedByService checks if a port is configured for any enabled service.
 func (d *Detector) isPortUsedByService(port int) bool {
 	for _, svc := range d.config.Services {
 		for _, cfg := range svc.Versions {
