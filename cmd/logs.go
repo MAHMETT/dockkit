@@ -7,13 +7,12 @@ import (
 )
 
 var logsCmd = &cobra.Command{
-	Use:   "logs [service]",
-	Short: "View service logs",
+	Use:   "logs [service-version]",
+	Short: "View service logs (e.g., dockkit logs postgresql-16)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: Stream logs from service
-		fmt.Printf("Viewing logs for: %s\n", args[0])
-		return nil
+		// TODO: Implement in Layer 2 (Docker Core)
+		return fmt.Errorf("not yet implemented — coming in Layer 2")
 	},
 }
 

@@ -6,7 +6,7 @@ import (
 )
 
 type CacheItem struct {
-	Value     interface{}
+	Value     any
 	ExpiresAt time.Time
 }
 
@@ -23,18 +23,22 @@ func NewCache(ttl time.Duration) *Cache {
 	}
 }
 
-func (c *Cache) Get(key string) (interface{}, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+func (c *Cache) Get(key string) (any, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	item, ok := c.items[key]
-	if !ok || time.Now().After(item.ExpiresAt) {
+	if !ok {
+		return nil, false
+	}
+	if time.Now().After(item.ExpiresAt) {
+		delete(c.items, key)
 		return nil, false
 	}
 	return item.Value, true
 }
 
-func (c *Cache) Set(key string, value interface{}) {
+func (c *Cache) Set(key string, value any) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -48,4 +52,18 @@ func (c *Cache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.items = make(map[string]CacheItem)
+}
+
+// Len returns the number of items in cache (including expired).
+func (c *Cache) Len() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.items)
+}
+
+// Delete removes a specific key.
+func (c *Cache) Delete(key string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.items, key)
 }

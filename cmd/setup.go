@@ -8,12 +8,11 @@ import (
 
 var setupCmd = &cobra.Command{
 	Use:   "setup [service]",
-	Short: "Setup a new service (non-TUI wizard)",
+	Short: "Setup a new service interactively (e.g., dockkit setup postgresql)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: Interactive CLI setup for service
-		fmt.Printf("Setting up service: %s\n", args[0])
-		return nil
+		// TODO: Implement in Layer 6 (CLI Commands)
+		return fmt.Errorf("not yet implemented — coming in Layer 6")
 	},
 }
 

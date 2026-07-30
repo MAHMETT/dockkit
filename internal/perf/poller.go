@@ -1,6 +1,7 @@
 package perf
 
 import (
+	"sync"
 	"time"
 )
 
@@ -13,13 +14,14 @@ const (
 )
 
 type Poller struct {
-	state         PollState
-	activeInterval time.Duration
-	idleInterval   time.Duration
+	mu              sync.Mutex
+	state           PollState
+	activeInterval  time.Duration
+	idleInterval    time.Duration
 	pausedInterval  time.Duration
-	changeCount    int
-	lastChange     time.Time
-	onPoll         func()
+	changeCount     int
+	lastChange      time.Time
+	onPoll          func()
 }
 
 func NewPoller(onPoll func()) *Poller {
@@ -34,6 +36,8 @@ func NewPoller(onPoll func()) *Poller {
 }
 
 func (p *Poller) Interval() time.Duration {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	switch p.state {
 	case PollActive:
 		return p.activeInterval
@@ -45,12 +49,16 @@ func (p *Poller) Interval() time.Duration {
 }
 
 func (p *Poller) RecordChange() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.changeCount = 0
 	p.state = PollActive
 	p.lastChange = time.Now()
 }
 
 func (p *Poller) RecordNoChange() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.changeCount++
 	if p.changeCount >= 3 {
 		p.state = PollIdle
@@ -58,9 +66,27 @@ func (p *Poller) RecordNoChange() {
 }
 
 func (p *Poller) Pause() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.state = PollPaused
 }
 
 func (p *Poller) Resume() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.state = PollActive
+}
+
+// State returns the current poll state (thread-safe).
+func (p *Poller) State() PollState {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.state
+}
+
+// LastChange returns the last time a change was recorded (thread-safe).
+func (p *Poller) LastChange() time.Time {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.lastChange
 }

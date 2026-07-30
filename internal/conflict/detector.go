@@ -3,7 +3,6 @@ package conflict
 import (
 	"fmt"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/MAHMETT/dockkit/internal/config"
@@ -81,13 +80,50 @@ func (d *Detector) detectPortConflicts() []Conflict {
 
 func (d *Detector) detectContainerNameConflicts() []Conflict {
 	var conflicts []Conflict
-	_ = strings.TrimSpace
+
+	for name, svc := range d.config.Services {
+		for ver, cfg := range svc.Versions {
+			if !cfg.Enabled {
+				continue
+			}
+			if cfg.ContainerName == "" {
+				continue
+			}
+			for otherName, otherSvc := range d.config.Services {
+				for otherVer, otherCfg := range otherSvc.Versions {
+					if !otherCfg.Enabled {
+						continue
+					}
+					if name == otherName && ver == otherVer {
+						continue
+					}
+					if cfg.ContainerName == otherCfg.ContainerName {
+						keyA := fmt.Sprintf("%s %s", name, ver)
+						keyB := fmt.Sprintf("%s %s", otherName, otherVer)
+						conflicts = append(conflicts, Conflict{
+							Type:     ConflictContainerName,
+							Severity: SeverityError,
+							ServiceA: keyA,
+							ServiceB: keyB,
+							Resource: cfg.ContainerName,
+							Message:  fmt.Sprintf("Container name %q used by both %s and %s", cfg.ContainerName, keyA, keyB),
+						})
+					}
+				}
+			}
+		}
+	}
+
 	return conflicts
 }
 
+// SuggestPort finds the next available port starting from port+1.
 func (d *Detector) SuggestPort(port int) string {
 	for offset := 1; offset <= 100; offset++ {
 		candidate := port + offset
+		if candidate < 1024 {
+			continue
+		}
 		if !isPortOccupied(candidate) && !d.isPortUsedByService(candidate) {
 			return fmt.Sprintf("%d", candidate)
 		}

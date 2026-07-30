@@ -20,39 +20,52 @@ type Stats struct {
 	mu             sync.RWMutex
 }
 
-var startTime = time.Now()
+var processStart = time.Now()
 
+// GetStats returns current runtime stats.
 func GetStats() *Stats {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
 	return &Stats{
-		Uptime:      time.Since(startTime),
+		Uptime:      time.Since(processStart),
 		Goroutines:  runtime.NumGoroutine(),
 		MemoryAlloc: m.Alloc,
 	}
 }
 
-func (s *Stats) RecordDockerCall() {
+func (s *Stats) IncDockerCalls() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.DockerAPICalls++
 }
 
-func (s *Stats) RecordHubCall() {
+func (s *Stats) IncHubCalls() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.HubAPICalls++
 }
 
-func (s *Stats) RecordCacheHit() {
+func (s *Stats) IncCacheHits() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.CacheHits++
 }
 
-func (s *Stats) RecordCacheMiss() {
+func (s *Stats) IncCacheMisses() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.CacheMisses++
 }
+
+// Deprecated: Use IncDockerCalls instead.
+func (s *Stats) RecordDockerCall() { s.IncDockerCalls() }
+
+// Deprecated: Use IncHubCalls instead.
+func (s *Stats) RecordHubCall() { s.IncHubCalls() }
+
+// Deprecated: Use IncCacheHits instead.
+func (s *Stats) RecordCacheHit() { s.IncCacheHits() }
+
+// Deprecated: Use IncCacheMisses instead.
+func (s *Stats) RecordCacheMiss() { s.IncCacheMisses() }
