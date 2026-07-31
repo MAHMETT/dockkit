@@ -139,7 +139,7 @@ func (m PermissionDialogModel) execWithSudo(password string) tea.Cmd {
 		// For now, show instructions
 		return messages.ToastMsg{
 			Message: "Sudo execution not yet implemented. Use terminal to run:\nsudo docker compose up -d",
-			Type:    2, // info
+			Type:    1, // error type — stays until dismissed
 		}
 	}
 }

@@ -64,6 +64,7 @@ func NewModel() Model {
 		help:          h,
 		spinner:       s,
 		cfg:           cfg,
+		helpOverlay:   components.NewHelpOverlay(),
 		dashboard:     screens.NewDashboardModel(),
 		servicePicker: screens.NewServicePickerModel(defaultTemplates()),
 		templateMgr:   screens.NewTemplateManagerModel(defaultTemplates()),
