@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/MAHMETT/dockkit/internal/config"
+	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
+
+	"github.com/MAHMETT/dockkit/internal/config"
+	tui "github.com/MAHMETT/dockkit/internal/tui"
 )
 
 var (
@@ -20,6 +23,18 @@ var rootCmd = &cobra.Command{
 	Use:   "dockkit",
 	Short: "Docker development infrastructure manager",
 	Long:  `dockkit is a CLI TUI tool for managing Docker-based development infrastructure services.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Default action: launch TUI
+		fmt.Println("Starting dockkit TUI...")
+		fmt.Println("(Press ? for help, Ctrl+C to quit)")
+		fmt.Println()
+
+		p := tea.NewProgram(tui.NewModel())
+		if _, err := p.Run(); err != nil {
+			return fmt.Errorf("TUI error: %w", err)
+		}
+		return nil
+	},
 }
 
 func Execute() {
