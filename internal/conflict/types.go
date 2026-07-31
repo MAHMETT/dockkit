@@ -1,6 +1,9 @@
 package conflict
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // ConflictType identifies the type of conflict.
 type ConflictType int
@@ -10,6 +13,7 @@ const (
 	ConflictContainerName
 	ConflictNetwork
 	ConflictVolume
+	ConflictDisabled
 )
 
 // String returns the string representation of ConflictType.
@@ -23,6 +27,8 @@ func (t ConflictType) String() string {
 		return "network"
 	case ConflictVolume:
 		return "volume"
+	case ConflictDisabled:
+		return "disabled"
 	default:
 		return "unknown"
 	}
@@ -130,18 +136,7 @@ func (cl ConflictList) Messages() string {
 	}
 	msgs := make([]string, len(cl))
 	for i, c := range cl {
-		msgs[i] = fmt.Sprintf("[%s] %s", c.Severity, c.Message)
+		msgs[i] = fmt.Sprintf("[%s] %s", c.Severity.String(), c.Message)
 	}
-	return joinStrings(msgs, "\n")
-}
-
-func joinStrings(strs []string, sep string) string {
-	if len(strs) == 0 {
-		return ""
-	}
-	result := strs[0]
-	for _, s := range strs[1:] {
-		result += sep + s
-	}
-	return result
+	return strings.Join(msgs, "\n")
 }

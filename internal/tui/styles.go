@@ -7,15 +7,12 @@ import (
 // Color palette
 var (
 	ColorPrimary    = lipgloss.Color("#7D56F4")
-	ColorSecondary  = lipgloss.Color("#FF6B6B")
 	ColorSuccess    = lipgloss.Color("#4ECDC4")
 	ColorWarning    = lipgloss.Color("#FFE66D")
 	ColorError      = lipgloss.Color("#FF6B6B")
 	ColorMuted      = lipgloss.Color("#6C757D")
-	ColorBackground = lipgloss.Color("#1A1A2E")
 	ColorForeground = lipgloss.Color("#EAEAEA")
 	ColorBorder     = lipgloss.Color("#3D3D5C")
-	ColorHighlight  = lipgloss.Color("#7D56F4")
 )
 
 // Styles holds all reusable styles
@@ -37,15 +34,6 @@ var Styles = struct {
 	Italic    lipgloss.Style
 	Muted     lipgloss.Style
 	Highlight lipgloss.Style
-
-	// Layout
-	Box       lipgloss.Style
-	BoxActive lipgloss.Style
-	Divider   lipgloss.Style
-
-	// List
- ListItem       lipgloss.Style
-	ListItemSelected lipgloss.Style
 
 	// Key
 	KeyHint lipgloss.Style
@@ -100,32 +88,8 @@ var Styles = struct {
 		Foreground(ColorMuted),
 
 	Highlight: lipgloss.NewStyle().
-		Foreground(ColorHighlight).
-		Bold(true),
-
-	// Layout
-	Box: lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(ColorBorder).
-		Padding(1, 2),
-
-	BoxActive: lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(ColorPrimary).
-		Padding(1, 2),
-
-	Divider: lipgloss.NewStyle().
-		Foreground(ColorBorder).
-		Padding(0, 0),
-
-	// List
-	ListItem: lipgloss.NewStyle().
-		Padding(0, 1),
-
-	ListItemSelected: lipgloss.NewStyle().
 		Foreground(ColorPrimary).
-		Bold(true).
-		Padding(0, 1),
+		Bold(true),
 
 	// Key
 	KeyHint: lipgloss.NewStyle().

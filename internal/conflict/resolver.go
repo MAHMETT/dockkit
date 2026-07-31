@@ -2,6 +2,8 @@ package conflict
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/MAHMETT/dockkit/internal/config"
 )
@@ -56,9 +58,7 @@ func (r *Resolver) Resolve(conflict Conflict) Resolution {
 		return r.resolvePortConflict(conflict)
 	case ConflictContainerName:
 		return r.resolveContainerNameConflict(conflict)
-	case ConflictNetwork:
-		return Resolution{Conflict: conflict, Action: ActionSkip}
-	case ConflictVolume:
+	case ConflictNetwork, ConflictVolume, ConflictDisabled:
 		return Resolution{Conflict: conflict, Action: ActionSkip}
 	default:
 		return Resolution{Conflict: conflict, Action: ActionManual}
@@ -75,7 +75,7 @@ func (r *Resolver) resolvePortConflict(c Conflict) Resolution {
 		Conflict: c,
 		Action:   ActionAutoFix,
 		Fix: &Fix{
-			Field:       fmt.Sprintf("services.%s.port", c.ServiceB),
+			Field:       fmt.Sprintf("services.%s.versions.port", c.ServiceB),
 			OldValue:    c.Resource,
 			NewValue:    c.Suggested,
 			Description: fmt.Sprintf("Change port from %s to %s for %s", c.Resource, c.Suggested, c.ServiceB),
@@ -85,8 +85,18 @@ func (r *Resolver) resolvePortConflict(c Conflict) Resolution {
 
 // resolveContainerNameConflict suggests a renamed container.
 func (r *Resolver) resolveContainerNameConflict(c Conflict) Resolution {
-	suggested := c.Resource + "-2"
-	field := fmt.Sprintf("services.%s.container_name", c.ServiceB)
+	// Build list of existing container names
+	existingNames := map[string]bool{}
+	for _, svc := range r.detector.config.Services {
+		for _, cfg := range svc.Versions {
+			if cfg.ContainerName != "" {
+				existingNames[cfg.ContainerName] = true
+			}
+		}
+	}
+
+	suggested := SuggestAvailableName(c.Resource, existingNames)
+	field := fmt.Sprintf("services.%s.versions.container_name", c.ServiceB)
 
 	return Resolution{
 		Conflict: c,
@@ -100,14 +110,23 @@ func (r *Resolver) resolveContainerNameConflict(c Conflict) Resolution {
 	}
 }
 
-// SuggestContainerName suggests an alternative container name.
+// SuggestContainerName suggests an alternative container name that doesn't conflict.
 func SuggestContainerName(base string, existingNames map[string]string) string {
-	if _, exists := existingNames[base]; !exists {
+	boolMap := make(map[string]bool, len(existingNames))
+	for k := range existingNames {
+		boolMap[k] = true
+	}
+	return SuggestAvailableName(base, boolMap)
+}
+
+// SuggestAvailableName finds a name that doesn't exist in the given set.
+func SuggestAvailableName(base string, existing map[string]bool) string {
+	if !existing[base] {
 		return base
 	}
 	for i := 2; i <= 100; i++ {
 		candidate := fmt.Sprintf("%s-%d", base, i)
-		if _, exists := existingNames[candidate]; !exists {
+		if !existing[candidate] {
 			return candidate
 		}
 	}
@@ -124,33 +143,43 @@ func AutoFix(cfg *config.Config, resolutions []Resolution) []Fix {
 		}
 
 		fix := res.Fix
-		switch fix.Field {
+
+		// Parse field path: "services.<name>.versions.<ver>.<field>"
+		parts := strings.Split(fix.Field, ".")
+		if len(parts) < 5 || parts[0] != "services" {
+			continue
+		}
+
+		serviceName := parts[1]
+		versionKey := parts[3]
+		fieldName := parts[4]
+
+		svc, ok := cfg.Services[serviceName]
+		if !ok {
+			continue
+		}
+
+		ver, ok := svc.Versions[versionKey]
+		if !ok {
+			continue
+		}
+
+		switch fieldName {
 		case "port":
-			// Find and update the port in config
-			for name, svc := range cfg.Services {
-				for ver, v := range svc.Versions {
-					key := fmt.Sprintf("%s %s", name, ver)
-					if key == res.Conflict.ServiceB {
-						v.Port = parsePort(fix.NewValue)
-						svc.Versions[ver] = v
-						cfg.Services[name] = svc
-						applied = append(applied, *fix)
-					}
-				}
+			port, err := strconv.Atoi(fix.NewValue)
+			if err == nil {
+				ver.Port = port
+				svc.Versions[versionKey] = ver
+				cfg.Services[serviceName] = svc
+				applied = append(applied, *fix)
 			}
+		case "container_name":
+			ver.ContainerName = fix.NewValue
+			svc.Versions[versionKey] = ver
+			cfg.Services[serviceName] = svc
+			applied = append(applied, *fix)
 		}
 	}
 
 	return applied
-}
-
-// parsePort parses a port string to int.
-func parsePort(s string) int {
-	n := 0
-	for _, c := range s {
-		if c >= '0' && c <= '9' {
-			n = n*10 + int(c-'0')
-		}
-	}
-	return n
 }

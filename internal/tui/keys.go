@@ -70,16 +70,16 @@ func DefaultKeyMap() KeyMap {
 
 		// Actions
 		Quit: key.NewBinding(
-			key.WithKeys("ctrl+c", "q"),
-			key.WithHelp("ctrl+c/q", "quit"),
+			key.WithKeys("ctrl+c"),
+			key.WithHelp("ctrl+c", "quit"),
 		),
 		Help: key.NewBinding(
 			key.WithKeys("?"),
 			key.WithHelp("?", "help"),
 		),
 		Refresh: key.NewBinding(
-			key.WithKeys("R"),
-			key.WithHelp("R", "refresh"),
+			key.WithKeys("r"),
+			key.WithHelp("r", "refresh"),
 		),
 		Search: key.NewBinding(
 			key.WithKeys("/"),
@@ -96,8 +96,8 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("x", "stop"),
 		),
 		Restart: key.NewBinding(
-			key.WithKeys("r"),
-			key.WithHelp("r", "restart"),
+			key.WithKeys("R"),
+			key.WithHelp("R", "restart"),
 		),
 		Logs: key.NewBinding(
 			key.WithKeys("l"),

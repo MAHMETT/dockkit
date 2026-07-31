@@ -1,6 +1,7 @@
 package components
 
 import (
+	tea "charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/lipgloss/v2"
 )
@@ -71,7 +72,7 @@ func (s SearchBar) Render() string {
 	return style.Render(s.input.View())
 }
 
-// Update updates the search bar.
-func (s *SearchBar) Update(msg interface{}) {
+// Update updates the search bar with a tea.Msg.
+func (s *SearchBar) Update(msg tea.Msg) {
 	s.input.Update(msg)
 }

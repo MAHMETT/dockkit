@@ -1,6 +1,7 @@
 package components
 
 import (
+	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
 )
 
@@ -27,14 +28,55 @@ var (
 			Foreground(lipgloss.Color("#EAEAEA"))
 )
 
+// KeyMapForHelp defines the keybindings for the help overlay.
+type KeyMapForHelp struct {
+	Navigation  []key.Binding
+	Actions     []key.Binding
+	Quick       []key.Binding
+}
+
+// DefaultKeyMapForHelp returns the default help keybindings.
+func DefaultKeyMapForHelp() KeyMapForHelp {
+	return KeyMapForHelp{
+		Navigation: []key.Binding{
+			key.NewBinding(key.WithKeys("up/k"), key.WithHelp("↑/k", "up")),
+			key.NewBinding(key.WithKeys("down/j"), key.WithHelp("↓/j", "down")),
+			key.NewBinding(key.WithKeys("left/h"), key.WithHelp("←/h", "left")),
+			key.NewBinding(key.WithKeys("right/l"), key.WithHelp("→/l", "right")),
+			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select")),
+			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
+		},
+		Actions: []key.Binding{
+			key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "start")),
+			key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "stop")),
+			key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "restart")),
+			key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "logs")),
+			key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "config")),
+			key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "remove")),
+		},
+		Quick: []key.Binding{
+			key.NewBinding(key.WithKeys("+"), key.WithHelp("+", "add service")),
+			key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "start all")),
+			key.NewBinding(key.WithKeys("X"), key.WithHelp("X", "stop all")),
+			key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
+			key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
+			key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "toggle help")),
+		},
+	}
+}
+
 // HelpOverlay displays help information.
 type HelpOverlay struct {
 	Visible bool
+	keyMap  KeyMapForHelp
 }
 
 // NewHelpOverlay creates a new help overlay.
 func NewHelpOverlay() HelpOverlay {
-	return HelpOverlay{Visible: false}
+	return HelpOverlay{
+		Visible: false,
+		keyMap:  DefaultKeyMapForHelp(),
+	}
 }
 
 // Render renders the help overlay.
@@ -47,40 +89,11 @@ func (h HelpOverlay) Render() string {
 
 	sections := []struct {
 		title string
-		items []struct{ key, desc string }
+		items []key.Binding
 	}{
-		{
-			title: "Navigation",
-			items: []struct{ key, desc string }{
-				{"↑/↓ or j/k", "Navigate up/down"},
-				{"←/→ or h/l", "Navigate left/right"},
-				{"Enter", "Select / Open"},
-				{"Esc / q", "Back / Quit"},
-				{"Tab", "Next section"},
-			},
-		},
-		{
-			title: "Service Actions",
-			items: []struct{ key, desc string }{
-				{"s", "Start service"},
-				{"x", "Stop service"},
-				{"r", "Restart service"},
-				{"l", "View logs"},
-				{"c", "Edit config"},
-				{"d", "Remove service"},
-			},
-		},
-		{
-			title: "Quick Actions",
-			items: []struct{ key, desc string }{
-				{"+", "Add new service"},
-				{"S", "Start all services"},
-				{"X", "Stop all services"},
-				{"R", "Refresh status"},
-				{"/", "Search / Filter"},
-				{"?", "Toggle this help"},
-			},
-		},
+		{"Navigation", h.keyMap.Navigation},
+		{"Service Actions", h.keyMap.Actions},
+		{"Quick Actions", h.keyMap.Quick},
 	}
 
 	content := title + "\n\n"
@@ -88,7 +101,8 @@ func (h HelpOverlay) Render() string {
 	for _, section := range sections {
 		content += helpSection.Render(section.title) + "\n"
 		for _, item := range section.items {
-			content += helpKey.Render(item.key) + helpDesc.Render(item.desc) + "\n"
+			help := item.Help()
+			content += helpKey.Render(help.Key) + helpDesc.Render(help.Desc) + "\n"
 		}
 		content += "\n"
 	}

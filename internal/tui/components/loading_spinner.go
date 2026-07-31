@@ -1,6 +1,7 @@
 package components
 
 import (
+	"charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/lipgloss/v2"
 )
@@ -26,13 +27,18 @@ func NewLoadingSpinner(message string) LoadingSpinner {
 	return LoadingSpinner{
 		spinner: s,
 		Message: message,
-		Visible: true,
+		Visible: false,
 	}
 }
 
-// Tick advances the spinner animation.
-func (l *LoadingSpinner) Tick() {
-	l.spinner.Tick()
+// Tick returns a tea.Cmd that advances the spinner animation.
+func (l *LoadingSpinner) Tick() tea.Cmd {
+	return l.spinner.Tick
+}
+
+// Update updates the spinner with a message.
+func (l *LoadingSpinner) Update(msg tea.Msg) {
+	l.spinner, _ = l.spinner.Update(msg)
 }
 
 // Render renders the loading spinner.

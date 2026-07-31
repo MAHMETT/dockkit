@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"fmt"
-
 	tea "charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
@@ -26,10 +24,9 @@ type Model struct {
 	spinner     spinner.Model
 	toast       components.Toast
 	helpOverlay components.HelpOverlay
-	loading     components.LoadingSpinner
 
-	// Data
-	err error
+	// State
+	toastTimer int // ticks until toast auto-dismiss
 }
 
 // NewModel creates a new root TUI model.
@@ -47,7 +44,6 @@ func NewModel() Model {
 		keys:    keys,
 		help:    h,
 		spinner: s,
-		loading: components.NewLoadingSpinner("Loading..."),
 	}
 }
 
@@ -94,24 +90,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.helpOverlay.Hide()
 
 	case messages.ToastMsg:
-		m.toast = components.NewToast(msg.Message, components.ToastType(msg.Type))
+		m.toast = components.NewToast(msg.Message, msg.Type)
+		m.toastTimer = 5 // auto-dismiss after 5 ticks (~5 seconds)
 
 	case messages.ErrorMsg:
-		m.err = msg.Err
-		m.toast = components.NewToast(msg.Message, components.ToastError)
+		m.toast = components.NewToast(msg.Message, 1) // 1 = error
+		m.toastTimer = 8 // errors stay longer
 
 	case messages.LoadingMsg:
-		m.loading.SetMessage(msg.Message)
-		if msg.Loading {
-			m.loading.Show()
-		} else {
-			m.loading.Hide()
-		}
+		// Loading state handled by screens
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
+
+		// Auto-dismiss toast
+		if m.toast.Visible && m.toastTimer > 0 {
+			m.toastTimer--
+			if m.toastTimer == 0 {
+				m.toast.Hide()
+			}
+		}
 	}
 
 	return m, tea.Batch(cmds...)
@@ -152,9 +152,7 @@ func (m Model) View() tea.View {
 // viewDashboard renders the dashboard screen.
 func (m Model) viewDashboard() string {
 	header := Styles.Header.Render("🐳 dockkit v1.0.0")
-	footer := Styles.Footer.Render("[?] Help [q] Quit")
+	footer := Styles.Footer.Render("[?] Help [ctrl+c] Quit")
 
-	status := Styles.Muted.Render(fmt.Sprintf("Width: %d | Height: %d", m.width, m.height))
-
-	return header + "\n\n" + status + "\n\n" + footer
+	return header + "\n\n" + footer
 }

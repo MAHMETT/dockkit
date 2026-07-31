@@ -1,7 +1,5 @@
 package messages
 
-import "time"
-
 // ScreenID identifies a TUI screen.
 type ScreenID int
 
@@ -23,11 +21,11 @@ type NavigateToMsg struct {
 	Data   interface{} // optional data to pass to screen
 }
 
-type BackMsg struct{}
-
 // Docker messages
 type StatusUpdateMsg struct {
-	// Will be populated with container states
+	Service string
+	Running bool
+	Health  string
 }
 
 type ContainerStartedMsg struct {
@@ -48,10 +46,6 @@ type LogsMsg struct {
 }
 
 // Config messages
-type ConfigLoadedMsg struct {
-	// Config loaded
-}
-
 type ConfigSavedMsg struct {
 	Service string
 }
@@ -61,22 +55,12 @@ type ConfigErrorMsg struct {
 }
 
 // System messages
-type TickMsg struct {
-	Time time.Time
-}
-
+// ToastMsg uses int for Type to avoid circular dependency with components.
+// Convert to components.ToastType at the call site.
 type ToastMsg struct {
 	Message string
-	Type    ToastType // success, error, info
+	Type    int // 0=success, 1=error, 2=info (matches components.ToastType)
 }
-
-type ToastType int
-
-const (
-	ToastSuccess ToastType = iota
-	ToastError
-	ToastInfo
-)
 
 type ErrorMsg struct {
 	Err     error
@@ -84,8 +68,10 @@ type ErrorMsg struct {
 }
 
 type LoadingMsg struct {
-	Loading bool
+	Active  bool // true to show, false to hide
 	Message string
 }
 
-type QuitMsg struct{}
+type TickMsg struct {
+	// Used for periodic updates
+}

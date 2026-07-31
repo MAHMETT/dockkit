@@ -42,10 +42,10 @@ type Toast struct {
 }
 
 // NewToast creates a new toast.
-func NewToast(message string, toastType ToastType) Toast {
+func NewToast(message string, toastType int) Toast {
 	return Toast{
 		Message: message,
-		Type:    toastType,
+		Type:    ToastType(toastType),
 		Visible: true,
 	}
 }

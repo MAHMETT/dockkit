@@ -104,7 +104,7 @@ func (d *Detector) detectDisabledServiceWarnings() ConflictList {
 			if !cfg.Enabled {
 				key := fmt.Sprintf("%s %s", name, ver)
 				conflicts = append(conflicts, Conflict{
-					Type:     ConflictPort,
+					Type:     ConflictDisabled,
 					Severity: SeverityWarning,
 					ServiceA: key,
 					Message:  fmt.Sprintf("Service %s is disabled", key),
@@ -120,6 +120,9 @@ func (d *Detector) detectDisabledServiceWarnings() ConflictList {
 func (d *Detector) SuggestPort(port int) string {
 	for offset := 1; offset <= 100; offset++ {
 		candidate := port + offset
+		if candidate > 65535 {
+			return ""
+		}
 		if candidate < 1024 {
 			continue
 		}
