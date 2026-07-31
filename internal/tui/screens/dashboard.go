@@ -44,6 +44,9 @@ type ServiceEntry struct {
 	ContainerName string
 }
 
+// AppVersion is set at build time via ldflags.
+var AppVersion = "dev"
+
 // DashboardModel is the dashboard screen.
 type DashboardModel struct {
 	services []ServiceEntry
@@ -112,7 +115,7 @@ func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
 func (m DashboardModel) View() string {
 	var b strings.Builder
 
-	b.WriteString(styleHeader.Render("🐳 dockkit v1.0.0"))
+	b.WriteString(styleHeader.Render("🐳 dockkit " + AppVersion))
 	b.WriteString("\n\n")
 
 	b.WriteString(styleBold.Render("Services"))

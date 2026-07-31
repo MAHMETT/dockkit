@@ -71,11 +71,19 @@ func (r *Resolver) resolvePortConflict(c Conflict) Resolution {
 		return Resolution{Conflict: c, Action: ActionManual}
 	}
 
+	// Parse ServiceB "name version" into service name and version key
+	parts := strings.SplitN(c.ServiceB, " ", 2)
+	if len(parts) != 2 {
+		return Resolution{Conflict: c, Action: ActionManual}
+	}
+	serviceName := parts[0]
+	versionKey := parts[1]
+
 	return Resolution{
 		Conflict: c,
 		Action:   ActionAutoFix,
 		Fix: &Fix{
-			Field:       fmt.Sprintf("services.%s.versions.port", c.ServiceB),
+			Field:       fmt.Sprintf("services.%s.versions.%s.port", serviceName, versionKey),
 			OldValue:    c.Resource,
 			NewValue:    c.Suggested,
 			Description: fmt.Sprintf("Change port from %s to %s for %s", c.Resource, c.Suggested, c.ServiceB),
@@ -96,7 +104,16 @@ func (r *Resolver) resolveContainerNameConflict(c Conflict) Resolution {
 	}
 
 	suggested := SuggestAvailableName(c.Resource, existingNames)
-	field := fmt.Sprintf("services.%s.versions.container_name", c.ServiceB)
+
+	// Parse ServiceB "name version" into service name and version key
+	parts := strings.SplitN(c.ServiceB, " ", 2)
+	if len(parts) != 2 {
+		return Resolution{Conflict: c, Action: ActionManual}
+	}
+	serviceName := parts[0]
+	versionKey := parts[1]
+
+	field := fmt.Sprintf("services.%s.versions.%s.container_name", serviceName, versionKey)
 
 	return Resolution{
 		Conflict: c,

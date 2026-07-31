@@ -72,7 +72,9 @@ func (s SearchBar) Render() string {
 	return style.Render(s.input.View())
 }
 
-// Update updates the search bar with a tea.Msg.
-func (s *SearchBar) Update(msg tea.Msg) {
-	s.input.Update(msg)
+// Update updates the search bar with a tea.Msg and returns a tea.Cmd.
+func (s *SearchBar) Update(msg tea.Msg) tea.Cmd {
+	var cmd tea.Cmd
+	s.input, cmd = s.input.Update(msg)
+	return cmd
 }

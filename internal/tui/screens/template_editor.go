@@ -51,13 +51,15 @@ func (m TemplateEditorModel) Update(msg tea.Msg) (TemplateEditorModel, tea.Cmd) 
 			return m, func() tea.Msg {
 				return messages.NavigateToMsg{Screen: messages.ScreenTemplateManager}
 			}
-		case key.Matches(msg, m.keys.Enter):
+		case msg.String() == "ctrl+s":
+			// Save template
 			return m, func() tea.Msg {
 				return messages.ToastMsg{Message: "Template saved!", Type: 0}
 			}
 		}
 	}
 
+	// Pass all keys to textarea (including Enter for newlines)
 	var cmd tea.Cmd
 	m.editor, cmd = m.editor.Update(msg)
 	return m, cmd

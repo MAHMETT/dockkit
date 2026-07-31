@@ -211,7 +211,7 @@ func (c *Client) FindContainerByName(ctx context.Context, name string) (*Contain
 		if ctr.Name == name {
 			return &ctr, nil
 		}
-		if len(ctr.ID) >= 12 && ctr.ID[:12] == name {
+		if strings.HasPrefix(ctr.ID, name) {
 			return &ctr, nil
 		}
 	}

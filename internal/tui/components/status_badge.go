@@ -6,6 +6,18 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
+// Cached styles for status badges (avoid allocation per render).
+var (
+	styleRunning   = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ECDC4")).Bold(true)
+	styleStopped   = lipgloss.NewStyle().Foreground(lipgloss.Color("#6C757D"))
+	styleHealthy   = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ECDC4"))
+	styleUnhealthy = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6B6B")).Bold(true)
+	styleStarting  = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFE66D"))
+	styleDefault   = lipgloss.NewStyle().Foreground(lipgloss.Color("#6C757D"))
+	stylePort      = lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4"))
+	stylePortNone  = lipgloss.NewStyle().Foreground(lipgloss.Color("#6C757D"))
+)
+
 // StatusBadge renders a status indicator.
 type StatusBadge struct {
 	Status string // running, stopped, healthy, unhealthy, starting
@@ -23,30 +35,22 @@ func (s StatusBadge) Render() string {
 
 	switch s.Status {
 	case "running":
-		style = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#4ECDC4")).
-			Bold(true)
+		style = styleRunning
 		icon = "●"
 	case "stopped":
-		style = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6C757D"))
+		style = styleStopped
 		icon = "○"
 	case "healthy":
-		style = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#4ECDC4"))
+		style = styleHealthy
 		icon = "✓"
 	case "unhealthy":
-		style = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF6B6B")).
-			Bold(true)
+		style = styleUnhealthy
 		icon = "✗"
 	case "starting":
-		style = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFE66D"))
+		style = styleStarting
 		icon = "⟳"
 	default:
-		style = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6C757D"))
+		style = styleDefault
 		icon = "-"
 	}
 
@@ -66,11 +70,7 @@ func NewPortBadge(port int) PortBadge {
 // Render renders the port badge.
 func (p PortBadge) Render() string {
 	if p.Port == 0 {
-		return lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6C757D")).
-			Render("-")
+		return stylePortNone.Render("-")
 	}
-	return lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#7D56F4")).
-		Render(fmt.Sprintf(":%d", p.Port))
+	return stylePort.Render(fmt.Sprintf(":%d", p.Port))
 }

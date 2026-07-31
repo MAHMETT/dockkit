@@ -87,8 +87,9 @@ func (d *ConfirmDialog) Right() {
 	d.Selected = 1
 }
 
-// Confirm confirms the current selection.
-func (d ConfirmDialog) Confirm() func() {
+// Confirm confirms the current selection and hides the dialog.
+func (d *ConfirmDialog) Confirm() func() {
+	d.Visible = false
 	if d.Selected == 0 {
 		return d.OnYes
 	}

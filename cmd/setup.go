@@ -92,6 +92,12 @@ var setupCmd = &cobra.Command{
 		// Generate container name
 		containerName := fmt.Sprintf("dockkit-%s-%s", serviceName, selectedVersion.Key)
 
+		// Build prefix safely (at least first 3 chars or full name)
+		prefix := strings.ToUpper(serviceName)
+		if len(serviceName) > 3 {
+			prefix = strings.ToUpper(serviceName[:3])
+		}
+
 		// Update config
 		if cfg.Services == nil {
 			cfg.Services = map[string]config.Service{}
@@ -100,7 +106,7 @@ var setupCmd = &cobra.Command{
 		svc, ok := cfg.Services[serviceName]
 		if !ok {
 			svc = config.Service{
-				Prefix:   strings.ToUpper(serviceName[:3]),
+				Prefix:   prefix,
 				Versions: map[string]config.ServiceVersion{},
 			}
 		}

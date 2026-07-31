@@ -2,6 +2,7 @@ package screens
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -82,13 +83,21 @@ func (m ServicePickerModel) View() string {
 	b.WriteString(styleHeader.Render("Add New Service"))
 	b.WriteString("\n\n")
 
+	// Group by category with sorted keys for deterministic order
 	categories := make(map[string][]TemplateEntry)
 	for _, tmpl := range m.templates {
 		categories[tmpl.Category] = append(categories[tmpl.Category], tmpl)
 	}
 
+	catNames := make([]string, 0, len(categories))
+	for cat := range categories {
+		catNames = append(catNames, cat)
+	}
+	sort.Strings(catNames)
+
 	cursor := 0
-	for cat, templates := range categories {
+	for _, cat := range catNames {
+		templates := categories[cat]
 		b.WriteString(styleHighlight.Render(cat))
 		b.WriteString("\n")
 		for _, tmpl := range templates {

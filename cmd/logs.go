@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/MAHMETT/dockkit/internal/docker"
 	"github.com/spf13/cobra"
@@ -54,8 +55,17 @@ var logsCmd = &cobra.Command{
 			return fmt.Errorf("docker is not running: %w", err)
 		}
 
+		// Parse tail
+		tailLines := "100"
+		if logsTail != "" {
+			if _, err := strconv.Atoi(logsTail); err == nil {
+				tailLines = logsTail
+			}
+		}
+
 		// Stream logs
 		fmt.Printf("Logs for %s %s (container: %s)\n", name, version, containerName)
+		fmt.Printf("Tail: %s lines\n", tailLines)
 		fmt.Println("---")
 		if logsFollow {
 			fmt.Println("(Press Ctrl+C to stop following)")

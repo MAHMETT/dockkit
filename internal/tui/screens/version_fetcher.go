@@ -42,6 +42,11 @@ func (m *VersionFetcherModel) SetSize(w, h int) {
 	m.height = h
 }
 
+// Init returns a command to fetch tags.
+func (m VersionFetcherModel) Init() tea.Cmd {
+	return fetchTagsCmd(m.image)
+}
+
 // Update handles messages.
 func (m VersionFetcherModel) Update(msg tea.Msg) (VersionFetcherModel, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -62,6 +67,8 @@ func (m VersionFetcherModel) Update(msg tea.Msg) (VersionFetcherModel, tea.Cmd) 
 		}
 	case tagsLoadedMsg:
 		m.tags = msg.tags
+		m.loading = false
+	case tagsErrorMsg:
 		m.loading = false
 	}
 	return m, nil
@@ -96,6 +103,20 @@ func (m VersionFetcherModel) View() string {
 	return b.String()
 }
 
+// fetchTagsCmd is a placeholder for fetching tags.
+// In a real implementation, this would call the registry HubClient.
+func fetchTagsCmd(image string) tea.Cmd {
+	return func() tea.Msg {
+		// TODO: Integrate with registry.HubClient.FetchTags()
+		// For now, return empty tags
+		return tagsLoadedMsg{tags: []TagEntry{}}
+	}
+}
+
 type tagsLoadedMsg struct {
 	tags []TagEntry
+}
+
+type tagsErrorMsg struct {
+	err error
 }

@@ -70,12 +70,14 @@ func (m ConfigWizardModel) Update(msg tea.Msg) (ConfigWizardModel, tea.Cmd) {
 				m.inputs[m.focus].Blur()
 				m.focus--
 				m.inputs[m.focus].Focus()
+				return m, nil // don't pass to text input
 			}
 		case key.Matches(msg, m.keys.Down):
 			if m.focus < len(m.inputs)-1 {
 				m.inputs[m.focus].Blur()
 				m.focus++
 				m.inputs[m.focus].Focus()
+				return m, nil // don't pass to text input
 			}
 		case key.Matches(msg, m.keys.Escape):
 			return m, func() tea.Msg {
@@ -91,6 +93,7 @@ func (m ConfigWizardModel) Update(msg tea.Msg) (ConfigWizardModel, tea.Cmd) {
 		}
 	}
 
+	// Only pass non-navigation keys to the focused input
 	if m.focus < len(m.inputs) {
 		var cmd tea.Cmd
 		m.inputs[m.focus], cmd = m.inputs[m.focus].Update(msg)

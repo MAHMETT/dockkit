@@ -137,6 +137,19 @@ func ValidateConfigField(field ConfigField, value string) error {
 		if len(value) > 256 {
 			return fmt.Errorf("%s is too long (max 256 characters)", field.Label)
 		}
+	case "select":
+		if len(field.Options) > 0 {
+			valid := false
+			for _, opt := range field.Options {
+				if opt == value {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				return fmt.Errorf("%s must be one of: %s", field.Label, strings.Join(field.Options, ", "))
+			}
+		}
 	}
 
 	return nil

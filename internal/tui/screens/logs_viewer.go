@@ -42,6 +42,9 @@ func NewLogsViewerModel(service ServiceEntry) LogsViewerModel {
 func (m *LogsViewerModel) SetSize(w, h int) {
 	m.width = w
 	m.height = h - 4
+	if m.height < 1 {
+		m.height = 1
+	}
 	m.viewport.SetWidth(w - 4)
 	m.viewport.SetHeight(m.height)
 }
