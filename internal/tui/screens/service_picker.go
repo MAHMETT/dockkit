@@ -36,9 +36,18 @@ type ServicePickerModel struct {
 }
 
 // NewServicePickerModel creates a new service picker.
+// Templates are sorted by category+name so flat index matches visual order.
 func NewServicePickerModel(templates []TemplateEntry) ServicePickerModel {
+	sorted := make([]TemplateEntry, len(templates))
+	copy(sorted, templates)
+	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].Category != sorted[j].Category {
+			return sorted[i].Category < sorted[j].Category
+		}
+		return sorted[i].Name < sorted[j].Name
+	})
 	return ServicePickerModel{
-		templates: templates,
+		templates: sorted,
 		cursor:    0,
 		keys:      defaultScreenKeys,
 	}

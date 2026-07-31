@@ -2,8 +2,10 @@ package screens
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/key"
@@ -40,9 +42,14 @@ func NewConfigWizardModel(data ConfigWizardData) ConfigWizardModel {
 		inputs[i].CharLimit = 64
 	}
 
-	// Set defaults from template
+	// Determine port — auto-suggest if default is taken
+	port := tmpl.DefaultPort
+	if isPortOccupied(port) {
+		port = suggestNextPort(port)
+	}
+
 	inputs[0].Prompt = "Port:          "
-	inputs[0].SetValue(strconv.Itoa(tmpl.DefaultPort))
+	inputs[0].SetValue(strconv.Itoa(port))
 
 	inputs[1].Prompt = "Username:      "
 	inputs[1].SetValue(tmpl.DefaultUser)
@@ -98,7 +105,6 @@ func (m ConfigWizardModel) Update(msg tea.Msg) (ConfigWizardModel, tea.Cmd) {
 				return messages.NavigateToMsg{Screen: messages.ScreenServicePicker}
 			}
 		case key.Matches(msg, m.keys.Enter):
-			// Validate and save
 			return m.saveConfig()
 		}
 	}
@@ -123,6 +129,18 @@ func (m ConfigWizardModel) saveConfig() (ConfigWizardModel, tea.Cmd) {
 			return messages.ConfigErrorMsg{
 				Message: fmt.Sprintf("Invalid port: %s (must be 1024-65535)", portStr),
 			}
+		}
+	}
+
+	// Check port availability
+	if isPortOccupied(port) {
+		suggested := suggestNextPort(port)
+		return m, func() tea.Msg {
+			msg := fmt.Sprintf("Port %d is already in use.", port)
+			if suggested > 0 {
+				msg += fmt.Sprintf(" Suggested: %d", suggested)
+			}
+			return messages.ConfigErrorMsg{Message: msg}
 		}
 	}
 
@@ -177,4 +195,31 @@ func (m ConfigWizardModel) View() string {
 	b.WriteString(styleMuted.Render("  [↑/↓] Navigate   [Enter] Install   [Esc] Cancel"))
 
 	return b.String()
+}
+
+// isPortOccupied checks if a port is in use on localhost.
+func isPortOccupied(port int) bool {
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), 100*time.Millisecond)
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
+}
+
+// suggestNextPort finds the next available port starting from port+1.
+func suggestNextPort(port int) int {
+	for offset := 1; offset <= 100; offset++ {
+		candidate := port + offset
+		if candidate > 65535 {
+			return 0
+		}
+		if candidate < 1024 {
+			continue
+		}
+		if !isPortOccupied(candidate) {
+			return candidate
+		}
+	}
+	return 0
 }

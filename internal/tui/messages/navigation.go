@@ -58,6 +58,7 @@ type ConfigSaveMsg struct {
 
 type ConfigSavedMsg struct {
 	Service string
+	Version string
 	Message string
 }
 

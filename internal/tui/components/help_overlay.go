@@ -26,6 +26,9 @@ var (
 
 	helpDesc = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#EAEAEA"))
+
+	helpMuted = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6C757D"))
 )
 
 // KeyMapForHelp defines the keybindings for the help overlay.
@@ -106,6 +109,8 @@ func (h HelpOverlay) Render() string {
 		}
 		content += "\n"
 	}
+
+	content += helpMuted.Render("Press ? or Esc to close")
 
 	return helpBorder.Render(content)
 }

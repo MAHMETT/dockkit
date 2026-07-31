@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -10,6 +11,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 
 	"github.com/MAHMETT/dockkit/internal/config"
+	"github.com/MAHMETT/dockkit/internal/docker"
 	"github.com/MAHMETT/dockkit/internal/templates"
 	"github.com/MAHMETT/dockkit/internal/tui/messages"
 	"github.com/MAHMETT/dockkit/internal/tui/components"
@@ -167,15 +169,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case messages.ConfigSaveMsg:
-		// Save config and generate docker-compose
 		cmd := m.handleConfigSave(msg)
 		cmds = append(cmds, cmd)
 
 	case messages.ConfigSavedMsg:
-		m.toast = components.NewToast(msg.Message, 0)
-		m.toastTimer = 5
-		// Navigate back to dashboard
-		m.screen = messages.ScreenDashboard
+		// Auto-start the service
+		cmd := m.startServiceCmd(msg.Service, msg.Version)
+		cmds = append(cmds, cmd)
 
 	case messages.ConfigErrorMsg:
 		m.toast = components.NewToast(msg.Message, 1)
@@ -244,18 +244,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // handleConfigSave saves the config and generates docker-compose.
 func (m Model) handleConfigSave(msg messages.ConfigSaveMsg) tea.Cmd {
 	return func() tea.Msg {
-		// Load or use current config
 		cfg := m.cfg
 		if cfg == nil {
 			cfg = config.DefaultConfig()
 		}
 
-		// Ensure services map exists
 		if cfg.Services == nil {
 			cfg.Services = map[string]config.Service{}
 		}
 
-		// Get or create service
 		svc, ok := cfg.Services[msg.ServiceName]
 		if !ok {
 			svc = config.Service{
@@ -267,7 +264,6 @@ func (m Model) handleConfigSave(msg messages.ConfigSaveMsg) tea.Cmd {
 			svc.Versions = map[string]config.ServiceVersion{}
 		}
 
-		// Add version
 		svc.Versions[msg.Version] = config.ServiceVersion{
 			Enabled:       true,
 			Port:          msg.Port,
@@ -279,30 +275,25 @@ func (m Model) handleConfigSave(msg messages.ConfigSaveMsg) tea.Cmd {
 		}
 		cfg.Services[msg.ServiceName] = svc
 
-		// Save config
 		if err := config.Save(cfg); err != nil {
 			return messages.ConfigErrorMsg{
-				Err:     err,
 				Message: fmt.Sprintf("Failed to save config: %v", err),
 			}
 		}
 
-		// Create service directory
 		serviceDir, err := config.ServiceDir(msg.ServiceName, msg.Version)
 		if err != nil {
 			return messages.ConfigErrorMsg{
-				Err:     err,
 				Message: fmt.Sprintf("Failed to create service directory: %v", err),
 			}
 		}
-		if err := ensureDir(serviceDir); err != nil {
+		if err := os.MkdirAll(serviceDir, 0700); err != nil {
 			return messages.ConfigErrorMsg{
-				Err:     err,
 				Message: fmt.Sprintf("Failed to create service directory: %v", err),
 			}
 		}
 
-		// Find template and render docker-compose
+		// Render docker-compose.yml
 		tmpl, err := templates.LoadBuiltin(msg.ServiceName)
 		if err == nil {
 			opts := templates.RenderOptions{
@@ -316,32 +307,52 @@ func (m Model) handleConfigSave(msg messages.ConfigSaveMsg) tea.Cmd {
 				Timezone:      cfg.General.Timezone,
 				Network:       cfg.General.DefaultNetwork,
 			}
-
 			composeYAML, err := templates.RenderToString(tmpl, opts)
 			if err == nil {
 				composePath := serviceDir + "/docker-compose.yml"
-				_ = writeFile(composePath, []byte(composeYAML), 0644)
+				os.WriteFile(composePath, []byte(composeYAML), 0644)
 			}
 		}
 
-		// Update local config
 		m.cfg = cfg
 
 		return messages.ConfigSavedMsg{
 			Service: msg.ServiceName,
-			Message: fmt.Sprintf("%s %s installed on port %d", msg.ServiceName, msg.Version, msg.Port),
+			Version: msg.Version,
+			Message: fmt.Sprintf("%s %s configured!", msg.ServiceName, msg.Version),
 		}
 	}
 }
 
-// ensureDir creates a directory if it doesn't exist.
-func ensureDir(path string) error {
-	return os.MkdirAll(path, 0700)
-}
+// startServiceCmd starts a service with docker compose.
+func (m Model) startServiceCmd(service, version string) tea.Cmd {
+	return func() tea.Msg {
+		dir, err := config.ServiceDir(service, version)
+		if err != nil {
+			return messages.ConfigErrorMsg{
+				Message: fmt.Sprintf("Cannot find service directory: %v", err),
+			}
+		}
 
-// writeFile writes data to a file.
-func writeFile(path string, data []byte, perm os.FileMode) error {
-	return os.WriteFile(path, data, perm)
+		// Check docker-compose.yml exists
+		if _, statErr := os.Stat(dir + "/docker-compose.yml"); os.IsNotExist(statErr) {
+			return messages.ConfigErrorMsg{
+				Message: "docker-compose.yml not found. Run setup again.",
+			}
+		}
+
+		// Start service
+		if err := docker.ComposeUp(context.Background(), dir); err != nil {
+			return messages.ConfigErrorMsg{
+				Message: fmt.Sprintf("Failed to start %s: %v", service, err),
+			}
+		}
+
+		return messages.ToastMsg{
+			Message: fmt.Sprintf("%s %s started successfully!", service, version),
+			Type:    0,
+		}
+	}
 }
 
 // View renders the TUI.
