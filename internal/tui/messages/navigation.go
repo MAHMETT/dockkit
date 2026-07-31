@@ -46,20 +46,32 @@ type LogsMsg struct {
 }
 
 // Config messages
+type ConfigSaveMsg struct {
+	ServiceName   string
+	Version       string
+	Port          int
+	User          string
+	Password      string
+	Database      string
+	ContainerName string
+}
+
 type ConfigSavedMsg struct {
 	Service string
+	Message string
 }
 
 type ConfigErrorMsg struct {
-	Err error
+	Err     error
+	Message string
 }
 
 // System messages
 // ToastMsg uses int for Type to avoid circular dependency with components.
-// Convert to components.ToastType at the call site.
+// 0=success, 1=error, 2=info
 type ToastMsg struct {
 	Message string
-	Type    int // 0=success, 1=error, 2=info (matches components.ToastType)
+	Type    int
 }
 
 type ErrorMsg struct {

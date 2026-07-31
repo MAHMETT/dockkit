@@ -2,6 +2,7 @@ package screens
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -11,10 +12,17 @@ import (
 	"github.com/MAHMETT/dockkit/internal/tui/messages"
 )
 
+// ConfigWizardData holds data passed to the config wizard.
+type ConfigWizardData struct {
+	Template        TemplateEntry
+	SelectedVersion string
+}
+
 // ConfigWizardModel handles service configuration.
 type ConfigWizardModel struct {
 	serviceName string
 	version     string
+	defaults    ConfigWizardData
 	inputs      []textinput.Model
 	focus       int
 	keys        screenKeys
@@ -23,31 +31,37 @@ type ConfigWizardModel struct {
 }
 
 // NewConfigWizardModel creates a new config wizard.
-func NewConfigWizardModel(serviceName, version string) ConfigWizardModel {
-	inputs := make([]textinput.Model, 4)
+func NewConfigWizardModel(data ConfigWizardData) ConfigWizardModel {
+	tmpl := data.Template
 
+	inputs := make([]textinput.Model, 4)
 	for i := range inputs {
 		inputs[i] = textinput.New()
 		inputs[i].CharLimit = 64
 	}
 
-	inputs[0].Placeholder = "5432"
+	// Set defaults from template
 	inputs[0].Prompt = "Port:          "
+	inputs[0].SetValue(strconv.Itoa(tmpl.DefaultPort))
 
-	inputs[1].Placeholder = "postgres"
 	inputs[1].Prompt = "Username:      "
+	inputs[1].SetValue(tmpl.DefaultUser)
 
-	inputs[2].Placeholder = "postgres"
 	inputs[2].Prompt = "Password:      "
 	inputs[2].EchoMode = textinput.EchoPassword
 	inputs[2].EchoCharacter = '•'
+	inputs[2].SetValue(tmpl.DefaultPassword)
 
-	inputs[3].Placeholder = "postgres"
 	inputs[3].Prompt = "Database:      "
+	inputs[3].SetValue(tmpl.DefaultDatabase)
+
+	// Focus first input
+	inputs[0].Focus()
 
 	return ConfigWizardModel{
-		serviceName: serviceName,
-		version:     version,
+		serviceName: tmpl.Name,
+		version:     data.SelectedVersion,
+		defaults:    data,
 		inputs:      inputs,
 		focus:       0,
 		keys:        defaultScreenKeys,
@@ -70,30 +84,26 @@ func (m ConfigWizardModel) Update(msg tea.Msg) (ConfigWizardModel, tea.Cmd) {
 				m.inputs[m.focus].Blur()
 				m.focus--
 				m.inputs[m.focus].Focus()
-				return m, nil // don't pass to text input
+				return m, nil
 			}
 		case key.Matches(msg, m.keys.Down):
 			if m.focus < len(m.inputs)-1 {
 				m.inputs[m.focus].Blur()
 				m.focus++
 				m.inputs[m.focus].Focus()
-				return m, nil // don't pass to text input
+				return m, nil
 			}
 		case key.Matches(msg, m.keys.Escape):
 			return m, func() tea.Msg {
 				return messages.NavigateToMsg{Screen: messages.ScreenServicePicker}
 			}
 		case key.Matches(msg, m.keys.Enter):
-			return m, func() tea.Msg {
-				return messages.ToastMsg{
-					Message: fmt.Sprintf("%s %s configured!", m.serviceName, m.version),
-					Type:    0,
-				}
-			}
+			// Validate and save
+			return m.saveConfig()
 		}
 	}
 
-	// Only pass non-navigation keys to the focused input
+	// Pass non-navigation keys to focused input
 	if m.focus < len(m.inputs) {
 		var cmd tea.Cmd
 		m.inputs[m.focus], cmd = m.inputs[m.focus].Update(msg)
@@ -101,6 +111,46 @@ func (m ConfigWizardModel) Update(msg tea.Msg) (ConfigWizardModel, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// saveConfig validates inputs and sends ConfigSaveMsg.
+func (m ConfigWizardModel) saveConfig() (ConfigWizardModel, tea.Cmd) {
+	// Parse port
+	portStr := m.inputs[0].Value()
+	port, err := strconv.Atoi(portStr)
+	if err != nil || port < 1024 || port > 65535 {
+		return m, func() tea.Msg {
+			return messages.ConfigErrorMsg{
+				Message: fmt.Sprintf("Invalid port: %s (must be 1024-65535)", portStr),
+			}
+		}
+	}
+
+	user := m.inputs[1].Value()
+	password := m.inputs[2].Value()
+	database := m.inputs[3].Value()
+
+	if user == "" {
+		return m, func() tea.Msg {
+			return messages.ConfigErrorMsg{Message: "Username is required"}
+		}
+	}
+
+	// Generate container name
+	containerName := fmt.Sprintf("dockkit-%s-%s",
+		strings.ToLower(m.serviceName), m.version)
+
+	return m, func() tea.Msg {
+		return messages.ConfigSaveMsg{
+			ServiceName:   strings.ToLower(m.serviceName),
+			Version:       m.version,
+			Port:          port,
+			User:          user,
+			Password:      password,
+			Database:      database,
+			ContainerName: containerName,
+		}
+	}
 }
 
 // View renders the config wizard.

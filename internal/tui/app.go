@@ -1,11 +1,16 @@
 package tui
 
 import (
+	"fmt"
+	"os"
+
 	tea "charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 
+	"github.com/MAHMETT/dockkit/internal/config"
+	"github.com/MAHMETT/dockkit/internal/templates"
 	"github.com/MAHMETT/dockkit/internal/tui/messages"
 	"github.com/MAHMETT/dockkit/internal/tui/components"
 	"github.com/MAHMETT/dockkit/internal/tui/screens"
@@ -38,6 +43,7 @@ type Model struct {
 
 	// State
 	toastTimer int
+	cfg        *config.Config
 }
 
 // NewModel creates a new root TUI model.
@@ -50,11 +56,18 @@ func NewModel() Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 
+	// Load config
+	cfg, err := config.Load()
+	if err != nil {
+		cfg = config.DefaultConfig()
+	}
+
 	return Model{
 		screen:      messages.ScreenDashboard,
 		keys:        keys,
 		help:        h,
 		spinner:     s,
+		cfg:         cfg,
 		dashboard:   screens.NewDashboardModel(),
 		servicePicker: screens.NewServicePickerModel(defaultTemplates()),
 		templateMgr: screens.NewTemplateManagerModel(defaultTemplates()),
@@ -64,14 +77,14 @@ func NewModel() Model {
 // defaultTemplates returns the built-in service templates.
 func defaultTemplates() []screens.TemplateEntry {
 	return []screens.TemplateEntry{
-		{Name: "PostgreSQL", Icon: "🐘", Category: "database", Versions: []string{"15", "16", "17"}},
-		{Name: "MySQL", Icon: "🐬", Category: "database", Versions: []string{"8.0", "8.4", "9.0"}},
-		{Name: "MariaDB", Icon: "🐭", Category: "database", Versions: []string{"11"}},
-		{Name: "Redis", Icon: "⚡", Category: "cache", Versions: []string{"7"}},
-		{Name: "MongoDB", Icon: "🍃", Category: "database", Versions: []string{"7", "8"}},
-		{Name: "MinIO", Icon: "📦", Category: "storage", Versions: []string{"latest"}},
-		{Name: "Elasticsearch", Icon: "🔍", Category: "search", Versions: []string{"8"}},
-		{Name: "Memcached", Icon: "🔧", Category: "cache", Versions: []string{"1.6"}},
+		{Name: "PostgreSQL", Icon: "🐘", Category: "database", Versions: []string{"15", "16", "17"}, DefaultPort: 5432, DefaultUser: "postgres", DefaultPassword: "postgres", DefaultDatabase: "postgres"},
+		{Name: "MySQL", Icon: "🐬", Category: "database", Versions: []string{"8.0", "8.4", "9.0"}, DefaultPort: 3306, DefaultUser: "root", DefaultPassword: "mysql", DefaultDatabase: "mysql"},
+		{Name: "MariaDB", Icon: "🐭", Category: "database", Versions: []string{"11"}, DefaultPort: 3306, DefaultUser: "root", DefaultPassword: "mariadb", DefaultDatabase: "mariadb"},
+		{Name: "Redis", Icon: "⚡", Category: "cache", Versions: []string{"7"}, DefaultPort: 6379, DefaultUser: "", DefaultPassword: "", DefaultDatabase: ""},
+		{Name: "MongoDB", Icon: "🍃", Category: "database", Versions: []string{"7", "8"}, DefaultPort: 27017, DefaultUser: "admin", DefaultPassword: "mongo", DefaultDatabase: "admin"},
+		{Name: "MinIO", Icon: "📦", Category: "storage", Versions: []string{"latest"}, DefaultPort: 9000, DefaultUser: "minioadmin", DefaultPassword: "minioadmin", DefaultDatabase: ""},
+		{Name: "Elasticsearch", Icon: "🔍", Category: "search", Versions: []string{"8"}, DefaultPort: 9200, DefaultUser: "", DefaultPassword: "", DefaultDatabase: ""},
+		{Name: "Memcached", Icon: "🔧", Category: "cache", Versions: []string{"1.6"}, DefaultPort: 11211, DefaultUser: "", DefaultPassword: "", DefaultDatabase: ""},
 	}
 }
 
@@ -92,12 +105,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.ready = true
 
-		// Set sizes on all screens
 		m.dashboard.SetSize(msg.Width, msg.Height)
 		m.servicePicker.SetSize(msg.Width, msg.Height)
 		m.templateMgr.SetSize(msg.Width, msg.Height)
 
 	case tea.KeyPressMsg:
+		// Help overlay blocks all keys except ? and Esc
+		if m.helpOverlay.Visible {
+			if key.Matches(msg, m.keys.Help) || key.Matches(msg, m.keys.Escape) {
+				m.helpOverlay.Hide()
+			}
+			return m, nil
+		}
+
 		// Global keys
 		if key.Matches(msg, m.keys.Quit) {
 			return m, tea.Quit
@@ -107,10 +127,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if key.Matches(msg, m.keys.Escape) {
-			if m.helpOverlay.Visible {
-				m.helpOverlay.Hide()
-				return m, nil
-			}
 			if m.screen != messages.ScreenDashboard {
 				m.screen = messages.ScreenDashboard
 				return m, nil
@@ -122,7 +138,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = msg.Screen
 		m.helpOverlay.Hide()
 
-		// Initialize screen-specific data
 		switch msg.Screen {
 		case messages.ScreenServiceDetail:
 			if svc, ok := msg.Data.(screens.ServiceEntry); ok {
@@ -130,11 +145,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.serviceDetail.SetSize(m.width, m.height)
 			}
 		case messages.ScreenConfigWizard:
-			if tmpl, ok := msg.Data.(screens.TemplateEntry); ok {
-				m.configWizard = screens.NewConfigWizardModel(tmpl.Name, "latest")
-				m.configWizard.SetSize(m.width, m.height)
-			} else if svc, ok := msg.Data.(screens.ServiceEntry); ok {
-				m.configWizard = screens.NewConfigWizardModel(svc.Name, svc.Version)
+			if data, ok := msg.Data.(screens.ConfigWizardData); ok {
+				m.configWizard = screens.NewConfigWizardModel(data)
 				m.configWizard.SetSize(m.width, m.height)
 			}
 		case messages.ScreenLogsViewer:
@@ -153,6 +165,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.templateEdit.SetSize(m.width, m.height)
 			}
 		}
+
+	case messages.ConfigSaveMsg:
+		// Save config and generate docker-compose
+		cmd := m.handleConfigSave(msg)
+		cmds = append(cmds, cmd)
+
+	case messages.ConfigSavedMsg:
+		m.toast = components.NewToast(msg.Message, 0)
+		m.toastTimer = 5
+		// Navigate back to dashboard
+		m.screen = messages.ScreenDashboard
+
+	case messages.ConfigErrorMsg:
+		m.toast = components.NewToast(msg.Message, 1)
+		m.toastTimer = 8
 
 	case messages.ToastMsg:
 		m.toast = components.NewToast(msg.Message, msg.Type)
@@ -214,6 +241,109 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+// handleConfigSave saves the config and generates docker-compose.
+func (m Model) handleConfigSave(msg messages.ConfigSaveMsg) tea.Cmd {
+	return func() tea.Msg {
+		// Load or use current config
+		cfg := m.cfg
+		if cfg == nil {
+			cfg = config.DefaultConfig()
+		}
+
+		// Ensure services map exists
+		if cfg.Services == nil {
+			cfg.Services = map[string]config.Service{}
+		}
+
+		// Get or create service
+		svc, ok := cfg.Services[msg.ServiceName]
+		if !ok {
+			svc = config.Service{
+				Prefix:   msg.ServiceName[:3],
+				Versions: map[string]config.ServiceVersion{},
+			}
+		}
+		if svc.Versions == nil {
+			svc.Versions = map[string]config.ServiceVersion{}
+		}
+
+		// Add version
+		svc.Versions[msg.Version] = config.ServiceVersion{
+			Enabled:       true,
+			Port:          msg.Port,
+			ContainerName: msg.ContainerName,
+			Image:         msg.ServiceName + ":" + msg.Version,
+			User:          msg.User,
+			Password:      msg.Password,
+			Database:      msg.Database,
+		}
+		cfg.Services[msg.ServiceName] = svc
+
+		// Save config
+		if err := config.Save(cfg); err != nil {
+			return messages.ConfigErrorMsg{
+				Err:     err,
+				Message: fmt.Sprintf("Failed to save config: %v", err),
+			}
+		}
+
+		// Create service directory
+		serviceDir, err := config.ServiceDir(msg.ServiceName, msg.Version)
+		if err != nil {
+			return messages.ConfigErrorMsg{
+				Err:     err,
+				Message: fmt.Sprintf("Failed to create service directory: %v", err),
+			}
+		}
+		if err := ensureDir(serviceDir); err != nil {
+			return messages.ConfigErrorMsg{
+				Err:     err,
+				Message: fmt.Sprintf("Failed to create service directory: %v", err),
+			}
+		}
+
+		// Find template and render docker-compose
+		tmpl, err := templates.LoadBuiltin(msg.ServiceName)
+		if err == nil {
+			opts := templates.RenderOptions{
+				ServiceName:   msg.ServiceName,
+				Version:       msg.Version,
+				Port:          msg.Port,
+				User:          msg.User,
+				Password:      msg.Password,
+				Database:      msg.Database,
+				ContainerName: msg.ContainerName,
+				Timezone:      cfg.General.Timezone,
+				Network:       cfg.General.DefaultNetwork,
+			}
+
+			composeYAML, err := templates.RenderToString(tmpl, opts)
+			if err == nil {
+				composePath := serviceDir + "/docker-compose.yml"
+				_ = writeFile(composePath, []byte(composeYAML), 0644)
+			}
+		}
+
+		// Update local config
+		m.cfg = cfg
+
+		return messages.ConfigSavedMsg{
+			Service: msg.ServiceName,
+			Message: fmt.Sprintf("%s %s installed on port %d", msg.ServiceName, msg.Version, msg.Port),
+		}
+	}
+}
+
+// ensureDir creates a directory if it doesn't exist.
+func ensureDir(path string) error {
+	return os.MkdirAll(path, 0700)
+}
+
+// writeFile writes data to a file.
+func writeFile(path string, data []byte, perm os.FileMode) error {
+	return os.WriteFile(path, data, perm)
+}
+
 // View renders the TUI.
 func (m Model) View() tea.View {
 	v := tea.NewView("")
@@ -246,12 +376,10 @@ func (m Model) View() tea.View {
 		content = "Screen not implemented"
 	}
 
-	// Layer help overlay
 	if m.helpOverlay.Visible {
 		content = m.helpOverlay.Render()
 	}
 
-	// Layer toast
 	if m.toast.Visible {
 		content += "\n" + m.toast.Render()
 	}
