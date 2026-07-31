@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/help"
@@ -20,20 +21,18 @@ import (
 
 // Model is the root TUI model.
 type Model struct {
-	// State
 	screen     messages.ScreenID
 	width      int
 	height     int
 	ready      bool
 
-	// Components
-	keys        KeyMap
-	help        help.Model
-	spinner     spinner.Model
-	toast       components.Toast
-	helpOverlay components.HelpOverlay
+	keys             KeyMap
+	help             help.Model
+	spinner          spinner.Model
+	toast            components.Toast
+	helpOverlay      components.HelpOverlay
+	permissionDialog screens.PermissionDialogModel
 
-	// Screens
 	dashboard     screens.DashboardModel
 	serviceDetail screens.ServiceDetailModel
 	servicePicker screens.ServicePickerModel
@@ -43,61 +42,51 @@ type Model struct {
 	versionFetch  screens.VersionFetcherModel
 	templateEdit  screens.TemplateEditorModel
 
-	// State
 	toastTimer int
 	cfg        *config.Config
 }
 
-// NewModel creates a new root TUI model.
 func NewModel() Model {
 	keys := DefaultKeyMap()
-
 	h := help.New()
 	h.ShowAll = true
-
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 
-	// Load config
 	cfg, err := config.Load()
 	if err != nil {
 		cfg = config.DefaultConfig()
 	}
 
 	return Model{
-		screen:      messages.ScreenDashboard,
-		keys:        keys,
-		help:        h,
-		spinner:     s,
-		cfg:         cfg,
-		dashboard:   screens.NewDashboardModel(),
+		screen:        messages.ScreenDashboard,
+		keys:          keys,
+		help:          h,
+		spinner:       s,
+		cfg:           cfg,
+		dashboard:     screens.NewDashboardModel(),
 		servicePicker: screens.NewServicePickerModel(defaultTemplates()),
-		templateMgr: screens.NewTemplateManagerModel(defaultTemplates()),
+		templateMgr:   screens.NewTemplateManagerModel(defaultTemplates()),
 	}
 }
 
-// defaultTemplates returns the built-in service templates.
 func defaultTemplates() []screens.TemplateEntry {
 	return []screens.TemplateEntry{
 		{Name: "PostgreSQL", Icon: "🐘", Category: "database", Versions: []string{"15", "16", "17"}, DefaultPort: 5432, DefaultUser: "postgres", DefaultPassword: "postgres", DefaultDatabase: "postgres"},
 		{Name: "MySQL", Icon: "🐬", Category: "database", Versions: []string{"8.0", "8.4", "9.0"}, DefaultPort: 3306, DefaultUser: "root", DefaultPassword: "mysql", DefaultDatabase: "mysql"},
 		{Name: "MariaDB", Icon: "🐭", Category: "database", Versions: []string{"11"}, DefaultPort: 3306, DefaultUser: "root", DefaultPassword: "mariadb", DefaultDatabase: "mariadb"},
-		{Name: "Redis", Icon: "⚡", Category: "cache", Versions: []string{"7"}, DefaultPort: 6379, DefaultUser: "", DefaultPassword: "", DefaultDatabase: ""},
+		{Name: "Redis", Icon: "⚡", Category: "cache", Versions: []string{"7"}, DefaultPort: 6379},
 		{Name: "MongoDB", Icon: "🍃", Category: "database", Versions: []string{"7", "8"}, DefaultPort: 27017, DefaultUser: "admin", DefaultPassword: "mongo", DefaultDatabase: "admin"},
-		{Name: "MinIO", Icon: "📦", Category: "storage", Versions: []string{"latest"}, DefaultPort: 9000, DefaultUser: "minioadmin", DefaultPassword: "minioadmin", DefaultDatabase: ""},
-		{Name: "Elasticsearch", Icon: "🔍", Category: "search", Versions: []string{"8"}, DefaultPort: 9200, DefaultUser: "", DefaultPassword: "", DefaultDatabase: ""},
-		{Name: "Memcached", Icon: "🔧", Category: "cache", Versions: []string{"1.6"}, DefaultPort: 11211, DefaultUser: "", DefaultPassword: "", DefaultDatabase: ""},
+		{Name: "MinIO", Icon: "📦", Category: "storage", Versions: []string{"latest"}, DefaultPort: 9000, DefaultUser: "minioadmin", DefaultPassword: "minioadmin"},
+		{Name: "Elasticsearch", Icon: "🔍", Category: "search", Versions: []string{"8"}, DefaultPort: 9200},
+		{Name: "Memcached", Icon: "🔧", Category: "cache", Versions: []string{"1.6"}, DefaultPort: 11211},
 	}
 }
 
-// Init initializes the TUI.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(
-		m.spinner.Tick,
-	)
+	return tea.Batch(m.spinner.Tick)
 }
 
-// Update handles messages.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
@@ -106,21 +95,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
-
+		m.helpOverlay.SetTermHeight(msg.Height)
 		m.dashboard.SetSize(msg.Width, msg.Height)
 		m.servicePicker.SetSize(msg.Width, msg.Height)
 		m.templateMgr.SetSize(msg.Width, msg.Height)
+		m.permissionDialog.SetSize(msg.Width, msg.Height)
 
 	case tea.KeyPressMsg:
-		// Help overlay blocks all keys except ? and Esc
+		// === HELP OVERLAY (highest priority) ===
 		if m.helpOverlay.Visible {
-			if key.Matches(msg, m.keys.Help) || key.Matches(msg, m.keys.Escape) {
+			switch {
+			case key.Matches(msg, m.keys.Help) || key.Matches(msg, m.keys.Escape):
 				m.helpOverlay.Hide()
+			case key.Matches(msg, m.keys.Up):
+				m.helpOverlay.ScrollUp()
+			case key.Matches(msg, m.keys.Down):
+				m.helpOverlay.ScrollDown()
 			}
 			return m, nil
 		}
 
-		// Global keys
+		// === DISMISS ERROR TOAST ===
+		if m.toast.Visible && m.toast.Type == components.ToastError {
+			m.toast.Hide()
+			return m, nil
+		}
+
+		// === GLOBAL KEYS ===
 		if key.Matches(msg, m.keys.Quit) {
 			return m, tea.Quit
 		}
@@ -166,6 +167,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.templateEdit = screens.NewTemplateEditorModel(name, "# Template: "+name+"\n")
 				m.templateEdit.SetSize(m.width, m.height)
 			}
+		case messages.ScreenPermissionDialog:
+			if data, ok := msg.Data.(screens.PermissionDialogData); ok {
+				m.permissionDialog = screens.NewPermissionDialogModel(data.Service, data.Version)
+				m.permissionDialog.SetSize(m.width, m.height)
+			}
 		}
 
 	case messages.ConfigSaveMsg:
@@ -173,27 +179,39 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 
 	case messages.ConfigSavedMsg:
-		// Auto-start the service
 		cmd := m.startServiceCmd(msg.Service, msg.Version)
 		cmds = append(cmds, cmd)
 
 	case messages.ConfigErrorMsg:
 		m.toast = components.NewToast(msg.Message, 1)
-		m.toastTimer = 8
+		m.toastTimer = -1 // error: no auto-dismiss
+
+	case messages.PermissionDeniedMsg:
+		m.screen = messages.ScreenPermissionDialog
+		m.permissionDialog = screens.NewPermissionDialogModel(msg.Service, msg.Version)
+		m.permissionDialog.SetSize(m.width, m.height)
 
 	case messages.ToastMsg:
 		m.toast = components.NewToast(msg.Message, msg.Type)
-		m.toastTimer = 5
+		switch msg.Type {
+		case 0: // success
+			m.toastTimer = 5
+		case 1: // error
+			m.toastTimer = -1 // never auto-dismiss
+		case 2: // info
+			m.toastTimer = 3
+		}
 
 	case messages.ErrorMsg:
 		m.toast = components.NewToast(msg.Message, 1)
-		m.toastTimer = 8
+		m.toastTimer = -1
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
 
+		// Auto-dismiss toast (only for positive timer values)
 		if m.toast.Visible && m.toastTimer > 0 {
 			m.toastTimer--
 			if m.toastTimer == 0 {
@@ -236,27 +254,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.templateEdit, cmd = m.templateEdit.Update(msg)
 		cmds = append(cmds, cmd)
+	case messages.ScreenPermissionDialog:
+		var cmd tea.Cmd
+		m.permissionDialog, cmd = m.permissionDialog.Update(msg)
+		cmds = append(cmds, cmd)
 	}
 
 	return m, tea.Batch(cmds...)
 }
 
-// handleConfigSave saves the config and generates docker-compose.
 func (m Model) handleConfigSave(msg messages.ConfigSaveMsg) tea.Cmd {
 	return func() tea.Msg {
 		cfg := m.cfg
 		if cfg == nil {
 			cfg = config.DefaultConfig()
 		}
-
 		if cfg.Services == nil {
 			cfg.Services = map[string]config.Service{}
 		}
 
 		svc, ok := cfg.Services[msg.ServiceName]
 		if !ok {
+			prefix := msg.ServiceName
+			if len(prefix) > 3 {
+				prefix = prefix[:3]
+			}
 			svc = config.Service{
-				Prefix:   msg.ServiceName[:3],
+				Prefix:   strings.ToUpper(prefix),
 				Versions: map[string]config.ServiceVersion{},
 			}
 		}
@@ -293,7 +317,6 @@ func (m Model) handleConfigSave(msg messages.ConfigSaveMsg) tea.Cmd {
 			}
 		}
 
-		// Render docker-compose.yml
 		tmpl, err := templates.LoadBuiltin(msg.ServiceName)
 		if err == nil {
 			opts := templates.RenderOptions{
@@ -324,7 +347,6 @@ func (m Model) handleConfigSave(msg messages.ConfigSaveMsg) tea.Cmd {
 	}
 }
 
-// startServiceCmd starts a service with docker compose.
 func (m Model) startServiceCmd(service, version string) tea.Cmd {
 	return func() tea.Msg {
 		dir, err := config.ServiceDir(service, version)
@@ -334,15 +356,21 @@ func (m Model) startServiceCmd(service, version string) tea.Cmd {
 			}
 		}
 
-		// Check docker-compose.yml exists
 		if _, statErr := os.Stat(dir + "/docker-compose.yml"); os.IsNotExist(statErr) {
 			return messages.ConfigErrorMsg{
 				Message: "docker-compose.yml not found. Run setup again.",
 			}
 		}
 
-		// Start service
 		if err := docker.ComposeUp(context.Background(), dir); err != nil {
+			// Check for permission denied
+			if strings.Contains(err.Error(), "permission denied") {
+				return messages.PermissionDeniedMsg{
+					Service: service,
+					Version: version,
+					Error:   err.Error(),
+				}
+			}
 			return messages.ConfigErrorMsg{
 				Message: fmt.Sprintf("Failed to start %s: %v", service, err),
 			}
@@ -355,7 +383,6 @@ func (m Model) startServiceCmd(service, version string) tea.Cmd {
 	}
 }
 
-// View renders the TUI.
 func (m Model) View() tea.View {
 	v := tea.NewView("")
 
@@ -383,6 +410,8 @@ func (m Model) View() tea.View {
 		content = m.versionFetch.View()
 	case messages.ScreenTemplateEditor:
 		content = m.templateEdit.View()
+	case messages.ScreenPermissionDialog:
+		content = m.permissionDialog.View()
 	default:
 		content = "Screen not implemented"
 	}

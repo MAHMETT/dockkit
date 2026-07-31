@@ -1,6 +1,8 @@
 package components
 
 import (
+	"fmt"
+
 	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
 )
@@ -29,13 +31,24 @@ var (
 
 	helpMuted = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#6C757D"))
+
+	helpIndicator = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6C757D")).
+			Faint(true)
 )
+
+// helpItem is a single help entry.
+type helpItem struct {
+	section string
+	key     string
+	desc    string
+}
 
 // KeyMapForHelp defines the keybindings for the help overlay.
 type KeyMapForHelp struct {
-	Navigation  []key.Binding
-	Actions     []key.Binding
-	Quick       []key.Binding
+	Navigation []key.Binding
+	Actions    []key.Binding
+	Quick      []key.Binding
 }
 
 // DefaultKeyMapForHelp returns the default help keybindings.
@@ -70,8 +83,10 @@ func DefaultKeyMapForHelp() KeyMapForHelp {
 
 // HelpOverlay displays help information.
 type HelpOverlay struct {
-	Visible bool
-	keyMap  KeyMapForHelp
+	Visible      bool
+	scrollOffset int
+	keyMap       KeyMapForHelp
+	termHeight   int
 }
 
 // NewHelpOverlay creates a new help overlay.
@@ -82,13 +97,40 @@ func NewHelpOverlay() HelpOverlay {
 	}
 }
 
-// Render renders the help overlay.
-func (h HelpOverlay) Render() string {
-	if !h.Visible {
-		return ""
-	}
+// SetTermHeight sets the terminal height for scroll calculation.
+func (h *HelpOverlay) SetTermHeight(height int) {
+	h.termHeight = height
+}
 
-	title := helpTitle.Render("dockkit — Help")
+// ScrollUp scrolls the help overlay up.
+func (h *HelpOverlay) ScrollUp() {
+	if h.scrollOffset > 0 {
+		h.scrollOffset--
+	}
+}
+
+// ScrollDown scrolls the help overlay down.
+func (h *HelpOverlay) ScrollDown() {
+	items := h.allItems()
+	visible := h.visibleHeight()
+	if h.scrollOffset < len(items)-visible {
+		h.scrollOffset++
+	}
+}
+
+// visibleHeight calculates how many help items fit on screen.
+func (h *HelpOverlay) visibleHeight() int {
+	// Title (2 lines) + border (2 lines) + footer (1 line) = 5 lines overhead
+	height := h.termHeight - 5
+	if height < 3 {
+		height = 3
+	}
+	return height
+}
+
+// allItems flattens all help sections into a single list.
+func (h *HelpOverlay) allItems() []helpItem {
+	var items []helpItem
 
 	sections := []struct {
 		title string
@@ -99,18 +141,72 @@ func (h HelpOverlay) Render() string {
 		{"Quick Actions", h.keyMap.Quick},
 	}
 
-	content := title + "\n\n"
-
 	for _, section := range sections {
-		content += helpSection.Render(section.title) + "\n"
 		for _, item := range section.items {
 			help := item.Help()
-			content += helpKey.Render(help.Key) + helpDesc.Render(help.Desc) + "\n"
+			items = append(items, helpItem{
+				section: section.title,
+				key:     help.Key,
+				desc:    help.Desc,
+			})
 		}
-		content += "\n"
 	}
 
-	content += helpMuted.Render("Press ? or Esc to close")
+	return items
+}
+
+// Render renders the help overlay.
+func (h HelpOverlay) Render() string {
+	if !h.Visible {
+		return ""
+	}
+
+	title := helpTitle.Render("dockkit — Help")
+
+	items := h.allItems()
+	visible := h.visibleHeight()
+
+	// Apply scroll bounds
+	if h.scrollOffset > len(items)-visible {
+		h.scrollOffset = len(items) - visible
+	}
+	if h.scrollOffset < 0 {
+		h.scrollOffset = 0
+	}
+
+	// Slice visible items
+	start := h.scrollOffset
+	end := start + visible
+	if end > len(items) {
+		end = len(items)
+	}
+	visibleItems := items[start:end]
+
+	content := title + "\n\n"
+
+	// Render visible items
+	lastSection := ""
+	for _, item := range visibleItems {
+		if item.section != lastSection {
+			if lastSection != "" {
+				content += "\n"
+			}
+			content += helpSection.Render(item.section) + "\n"
+			lastSection = item.section
+		}
+		content += helpKey.Render(item.key) + helpDesc.Render(item.desc) + "\n"
+	}
+
+	// Scroll indicator
+	if len(items) > visible {
+		content += "\n"
+		content += helpIndicator.Render(fmt.Sprintf(
+			"↑↓ to scroll (%d/%d)   ? or Esc to close",
+			start+1, len(items),
+		))
+	} else {
+		content += "\n" + helpMuted.Render("Press ? or Esc to close")
+	}
 
 	return helpBorder.Render(content)
 }
@@ -118,14 +214,19 @@ func (h HelpOverlay) Render() string {
 // Toggle toggles the help overlay visibility.
 func (h *HelpOverlay) Toggle() {
 	h.Visible = !h.Visible
+	if !h.Visible {
+		h.scrollOffset = 0
+	}
 }
 
 // Show shows the help overlay.
 func (h *HelpOverlay) Show() {
 	h.Visible = true
+	h.scrollOffset = 0
 }
 
 // Hide hides the help overlay.
 func (h *HelpOverlay) Hide() {
 	h.Visible = false
+	h.scrollOffset = 0
 }

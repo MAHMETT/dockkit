@@ -12,13 +12,14 @@ const (
 	ScreenLogsViewer
 	ScreenTemplateManager
 	ScreenTemplateEditor
+	ScreenPermissionDialog
 	ScreenError
 )
 
 // Navigation messages
 type NavigateToMsg struct {
 	Screen ScreenID
-	Data   interface{} // optional data to pass to screen
+	Data   interface{}
 }
 
 // Docker messages
@@ -67,9 +68,22 @@ type ConfigErrorMsg struct {
 	Message string
 }
 
+// Permission messages
+type PermissionDeniedMsg struct {
+	Service string
+	Version string
+	Error   string
+}
+
+type SudoExecMsg struct {
+	Service    string
+	Version    string
+	Password   string
+	ServiceDir string
+}
+
 // System messages
-// ToastMsg uses int for Type to avoid circular dependency with components.
-// 0=success, 1=error, 2=info
+// ToastMsg type: 0=success, 1=error, 2=info
 type ToastMsg struct {
 	Message string
 	Type    int
@@ -81,10 +95,8 @@ type ErrorMsg struct {
 }
 
 type LoadingMsg struct {
-	Active  bool // true to show, false to hide
+	Active  bool
 	Message string
 }
 
-type TickMsg struct {
-	// Used for periodic updates
-}
+type TickMsg struct{}

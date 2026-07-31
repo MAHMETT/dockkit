@@ -23,6 +23,10 @@ var (
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#3D3D5C")).
 			Padding(0, 1)
+
+	toastDismiss = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6C757D")).
+			Faint(true)
 )
 
 // ToastType represents the type of toast message.
@@ -62,6 +66,7 @@ func (t Toast) Render() string {
 		styled = toastSuccess.Render("✓ " + t.Message)
 	case ToastError:
 		styled = toastError.Render("✗ " + t.Message)
+		styled += "\n" + toastDismiss.Render("Press any key to dismiss")
 	case ToastInfo:
 		styled = toastInfo.Render("ℹ " + t.Message)
 	}
